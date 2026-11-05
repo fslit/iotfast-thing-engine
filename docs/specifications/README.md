@@ -21,6 +21,8 @@
 
 产品概念与落地取舍参见 [IDMP 理念评估与本引擎应用设计](../architecture/idmp-reference-assessment.md)。
 
+已有外部库的连接、字段到模型映射与历史查询参见 [外部时序库引用与映射设计](external-tsdb-reference-mapping.md)。
+
 外部数据库的统一接口、能力协商与差异扩展参见 [TSDB 共性与异性接口设计](tsdb-common-extension-interface.md)。
 
 多时序库的适配、持久确认、同步和查询能力差异，参见 [时序数据库接入与数据一致性设计](timeseries-storage.md)。该文是总体设计的细化，适配器能力以实际版本验证为准。
