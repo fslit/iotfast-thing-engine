@@ -57,7 +57,7 @@ RFC 8785 的 JSON Canonicalization Scheme（JCS）给出确定性 JSON 输出，
 
 ## 4. 已完成的局部核对
 
-执行环境 2026-11-06：
+执行环境：2026-11-06，Python 3.12.14、Node.js v24.22.1；计算基于本节的虚构对象：
 - Python 3 使用标准库对第 3 节仅 ASCII key / 单层数字示例进行 `json.dumps(sort_keys=True, ensure_ascii=False, separators=(',', ':'))` 与 `hashlib.sha256`；两个示例均为 357 字节并得到上述摘要。
 - Node.js 用按照候选排序手动构造的同一个 0.42 对象，`JSON.stringify` + `crypto.createHash('sha256')` 得到相同的 357 字节与摘要。
 
