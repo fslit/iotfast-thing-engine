@@ -19,6 +19,8 @@
 
 多时序库的适配、持久确认、同步和查询能力差异，参见 [时序数据库接入与数据一致性设计](timeseries-storage.md)。该文是总体设计的细化，适配器能力以实际版本验证为准。
 
+OEE、能耗和衍生指标与模型的结合参见 [衍生指标与算法设计](derived-metrics-oee-energy.md)。
+
 设备模型、实例、绑定、观测与实时业务视图的完整闭环参见 [设备业务模型详细设计](device-business-model.md)。
 
 完整的逻辑表、键、关系、事务和建表顺序参见 [数据库表结构设计](database-schema-design.md)。
