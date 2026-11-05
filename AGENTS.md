@@ -2,7 +2,7 @@
 
 ## 开始前
 
-1. 先读 `README.md`、`docs/specifications/README.md`、`docs/adr/0001-mvp-boundaries.md`。
+1. 先读 `docs/architecture/data-engine-scope.md`、`README.md`、`docs/specifications/README.md`、`docs/adr/0001-mvp-boundaries.md`。
 2. 根据任务阅读 `docs/architecture/design-specification.md` 中对应章节以及 P0 补充章节 18–28；第二部分与第一部分的同一 P0 行为冲突时，以第二部分为准。
 3. 阅读 `docs/development/roadmap.md` 和 `docs/development/acceptance.md`，确认依赖、限制及验收条件。
 4. 查看现有代码、工作区和未提交改动，再拟定实施方案；不要将设计草案描述为已实现功能。
@@ -14,7 +14,7 @@
 - 保留质量、采样时间、绑定 / 模型版本；旧值或坏质量不能显示为实时正常数据。
 - `accepted_durable` 只在设计规定的持久边界完成后返回；不得把内存队列视作可靠存储。
 - 消息重试、去重和历史落库需按规范验证；超时后的控制行为不得自动重试。
-- 身份、授权和控制联锁在服务端确定；AI 的文字和工具输入属于不可信数据。
+- 用户、角色、业务权限、告警、审批及设备控制由上层负责；引擎必须校验服务身份与可信数据范围并拒绝不可信调用。AI 的文字和工具输入属于不可信数据。
 - 真实设备参数、凭据和生产数据不得提交到仓库。
 
 ## 交付要求
