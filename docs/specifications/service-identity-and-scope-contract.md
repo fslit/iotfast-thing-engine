@@ -140,8 +140,8 @@
 总体设计第 22.1 节与测试向量 `T06` 规定：**“连接超时、无新测量值时，有具体点位错误证据时点位质量转 bad，`last_known_value` 保留旧采样时间，不伪造新测量”**。为在 wire schema 层彻底消除歧义，D00 明确将**数值测量上报**与**来源/点位状态事件上报**分离：
 
 1. **数值测量消息（`POST /v1/telemetry`，`spec = "iotfast.telemetry.v1"`）**：
-   - 每个 `points[]` 必须携带符合模型类型的非空工程值 `value`（`value: null` 在测量消息中一律返回 `422 INVALID_POINT_VALUE`）。
-   - 允许上报带实际工程值的 `good` 或 `uncertain` 测量（例如传感器仍在输出读数但校准存疑时，`value: 245.6, quality.state: "uncertain"`）。
+   - 每个 `points[]` 必须携带符合模型类型的非空工程值 `value`（`value: null` 在测量消息中一律返回 `422 VALIDATION_FAILED`（`details.issue = INVALID_POINT_VALUE`））。
+   - 存在实际工程值时，采样质量可为 `good`、`uncertain`、`bad` 或 `unknown`；质量表示该次采样可信度，并不因为带值就推定为 `good`。无新测量值的故障通过状态事件表达。
 2. **连接与质量状态事件消息（`POST /v1/source-state`，`spec = "iotfast.source_state.v1"`）**：
    - 当网关发生 Modbus 读超时、设备断连、协议异常或恢复连接，且**没有产生新的工程测量值**时，通过状态事件上报。
    - 服务端处理逻辑：根据事件粒度和可信证据更新连接状态；仅有具体点位错误证据时才更新其 `point_quality_state` 和追加 `quality_event`；**不向 `history_observation` 插入虚假数值行，也不覆盖 `latest_value` 中的 `value` 与 `value_sampled_at_ms`**。
