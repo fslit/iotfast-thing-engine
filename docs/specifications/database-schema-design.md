@@ -92,9 +92,12 @@ tenant_id ID、channel_id ID PK、source_id ID、protocol_id ID、name TEXT、co
 
 tenant_id ID、binding_revision_id ID PK、device_id ID、model_revision_id ID、source_id ID、revision_no BIGINT、state TEXT、config_hash TEXT、normalization_owner TEXT、created_at_ms TS、activated_at_ms TS?、superseded_at_ms TS?、gateway_ack JSON?。UNIQUE(tenant_id, device_id, revision_no)；同设备至多一个 active。P0 normalization_owner=gateway；ready 并不代表设备已联通。激活需要条件版本、网关 ACK 或人工停采窗口；如无可靠生效时钟，旧版本迟到数据无法证明时隔离而非猜测。
 
-### 5.5 point_binding：点位绑定
+### 5.5 point_binding：点位绑定与数据来源统一入口
 
-tenant_id ID、binding_revision_id ID、property_identifier TEXT、channel_id ID、protocol_address JSON、raw_type TEXT、byte_order TEXT?、word_order TEXT?、transform_spec JSON、sample_interval_ms BIGINT、enabled BOOL。PK(binding_revision_id, property_identifier)；引用模型对应的 property。Modbus 地址须明确零基、功能码、寄存器数量、站号与字节 / 字顺序；transform_spec 如 factor 0.1 是网关工程量转换的配置与追溯信息，引擎不再次换算。
+tenant_id ID、binding_revision_id ID、property_identifier TEXT、source_kind TEXT、channel_id ID?、protocol_address JSON?、raw_type TEXT?、byte_order TEXT?、word_order TEXT?、transform_spec JSON?、reference_revision_id ID?、sample_interval_ms BIGINT?、enabled BOOL。PK(binding_revision_id, property_identifier)；引用模型对应的 property。
+
+- P0 阶段 `source_kind` 固定为 `gateway_measurement`：`channel_id`、`protocol_address`、`raw_type` 必填；Modbus 地址须明确零基、功能码、寄存器数量、站号与字节 / 字顺序；`transform_spec` 如 factor 0.1 是网关工程量转换的配置与追溯信息，引擎不再次换算。
+- P1/P2 阶段 `source_kind` 可扩展为 `external_reference`、`derived_metric`、`static_config`、`external_fact`（见 [资产模板与数据引用](asset-template-and-source-reference.md)），并通过 `reference_revision_id` 指向对应扩展快照，保证同一资源在同一有效时段内只有一个权威绑定入口，不建立两套平行覆盖的绑定表。
 
 ## 6. 实时状态与质量
 
@@ -120,12 +123,12 @@ tenant_id ID、resource_id ID PK、quality_state TEXT、quality_reason TEXT?、s
 | model_revision_id / binding_revision_id | ID | 当时版本，不随当前配置变更 |
 | source_id / source_epoch / source_seq | ID / TEXT / TEXT | 来源与顺序；source_seq 按数值语义比较 |
 | source_at_ms / received_at_ms | TS | 原采样时间与服务接收时间 |
-| source_time_origin | TEXT | 设备 / 网关等来源，词表待冻结 |
+| source_time_origin | TEXT | 枚举：`device_clock` / `protocol_timestamp` / `gateway_sample` / `external_source`（见 [D00 公共契约](service-identity-and-scope-contract.md)） |
 | value_type | TEXT | float64 / int64 / bool / text / json |
 | value_f64 / value_i64 / value_bool / value_text / value_json | DOUBLE? / BIGINT? / BOOL? / TEXT? / JSON? | 仅一个值列有效，NULL 不代表 0 |
 | quality_state / quality_reason / source_quality_code | TEXT / TEXT? / TEXT? | 标准与原始质量 |
 | replayed | BOOL | 补传标记，不改变质量 |
-| ingested_wal_position | TEXT | WAL 定位，编码待冻结 |
+| ingested_wal_position | TEXT | WAL 定位，固定可比较格式 `"{segment_no:016x}:{record_offset:016x}"` |
 
 一个 message 包含多个 property 时，每个 property 各有不同 observation_id；相同资源与采样毫秒可存在多条。P0 可按 value_type 分成 numeric / integer / bool / text / json 多张物理表，但只能在能保留所有字段、稳定 ID 和按资源统一查询的前提下使用；跨表查询应保留 typed value 且经过测试。该逻辑行不保证所有时序库能无损表达，目标必须提供能力报告。
 
@@ -159,15 +162,28 @@ target_checkpoint：tenant_id ID、target_id ID、stream_id ID、contiguous_wal_
 
 delivery_gap：tenant_id ID、gap_id ID PK、target_id ID、observation_id ID、wal_position TEXT、reason TEXT、decision TEXT、approved_by ID?、created_at_ms TS、closed_at_ms TS?。只有显式授权的隔离 / 跳过产生 gap，必须在查询和运维界面显示。例：101 committed，102 unknown，103 committed，则连续 checkpoint 至多 101；保留 103 完成状态，102 解决或经授权隔离并披露后才可推进。
 
-## 9. 事件、控制和审计（后续阶段）
+## 9. 审计、P1/P2 扩展表与上层控制候选
 
-- device_event：tenant_id、event_id PK、device_id、resource_id、model_revision_id、event_identifier、payload JSON、occurred_at_ms、quality；设备事件不是告警闭环。
-- command：tenant_id、command_id PK、device_id、service_identifier、request_hash、idempotency_key、principal_id、model_revision_id、binding_revision_id、status、created_at_ms、expires_at_ms、result JSON?；幂等唯一域为租户 + 主体 + 设备 / 动作 + key。
-- command_transition：tenant_id、transition_id PK、command_id、from_state、to_state、reason、created_at_ms；状态变化不可伪装为物理动作完成。
-- command_confirmation：tenant_id、confirmation_id PK、command_id、request_hash、approver_id、expires_at_ms、consumed_at_ms?、status；凭据 / 原始令牌不明文落库；一次性消费须事务保护。
-- audit_log：tenant_id、audit_id PK、principal_id、action、target_type、target_id、before_hash、after_hash、result、occurred_at_ms、request_id；不保存密码 / 密钥。
+### 9.1 控制面审计与设备事件
 
-上述为扩展设计，真实控制不属于只读 MVP。报警规则、告警实例 / 确认与关闭生命周期属于独立模块，尚未在此定义为已完成。
+- `audit_log`（P0 必需）：`tenant_id ID`、`audit_id ID PK`、`caller_service_id ID`、`operator_id ID?`、`action TEXT`、`target_type TEXT`、`target_id ID`、`before_hash TEXT?`、`after_hash TEXT?`、`result TEXT`、`occurred_at_ms TS`、`request_id TEXT`；所有模型、资产、设备与绑定写操作必须记录，不保存密码或密钥。
+- `device_event`（P1 规划）：`tenant_id`、`event_id PK`、`device_id`、`resource_id`、`model_revision_id`、`event_identifier`、`payload JSON`、`occurred_at_ms`、`quality`；设备事件仅表达标准化事实，业务告警流转与通知闭环由上层负责。
+
+### 9.2 P1/P2 扩展表：资产关系、外部时序库引用与衍生指标
+
+以下逻辑表对应 P1/P2 专题规范，与 P0 核心表通过 `tenant_id`、`asset_id`、`resource_id` 和 `point_binding.reference_revision_id` 衔接，不在 P0 阶段强行启用：
+
+- **非层级资产关系（见 [资产模板与数据引用](asset-template-and-source-reference.md)）**：
+  - `asset_relation`：`tenant_id ID`、`relation_id ID PK`、`from_asset_id ID`、`relation_type TEXT`（`FEEDS` / `MEASURED_BY` / `UPSTREAM_OF`）、`to_asset_id ID`、`valid_from_ms TS`、`valid_to_ms TS?`、`source TEXT`、`revision BIGINT`。不改变 `asset.parent_asset_id` 主树。
+- **外部 TSDB 只读引用（见 [外部时序库引用与映射设计](external-tsdb-reference-mapping.md)）**：
+  - `source_connection`：`tenant_id ID`、`source_connection_id ID PK`、`adapter_kind TEXT`、`endpoint_ref TEXT`、`credential_ref TEXT`、`allowed_objects JSON`、`capability_snapshot JSON`、`status TEXT`、`updated_at_ms TS`。
+  - `attribute_reference_revision`：`tenant_id ID`、`reference_revision_id ID PK`、`resource_id ID`、`source_connection_id ID`、`source_object JSON`、`field_mapping JSON`、`unit_transform JSON?`、`quality_mapping JSON`、`valid_from_ms TS`、`valid_to_ms TS?`、`state TEXT`。发布后不可变，同一 `resource_id` 的权威生效时间区间不得重叠。
+- **衍生指标与算法运行（见 [衍生指标与算法设计](derived-metrics-oee-energy.md)）**：
+  - `metric_definition`、`algorithm_revision`、`metric_binding_revision`、`calculation_run`、`metric_result_revision`、`metric_lineage_ref`、`metric_latest`。
+
+### 9.3 上层控制服务候选表（不属本引擎研发范围）
+
+- `command`、`command_transition`、`command_confirmation`：根据 [ADR 0002](../adr/0002-data-engine-boundary.md) 与 [数据引擎定位规范](../architecture/data-engine-scope.md)，设备控制、审批与联锁归上层或独立控制服务负责，保留此处字段摘要仅作跨服务追溯参考。
 
 ## 10. 完整示例与入库过程
 

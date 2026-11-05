@@ -17,7 +17,7 @@
 5. [设计决策记录](docs/adr/0001-mvp-boundaries.md)：首期范围与不可假定的事项。
 6. [AI 开发工作规范](AGENTS.md)：开发代理在本仓库工作时的阅读顺序和执行边界。
 
-补充文档：[P0 遥测入站契约草案](docs/specifications/p0-telemetry-contract.md) · [技术可行性验证计划](docs/development/feasibility-plan.md)。
+补充文档：[服务身份与 D00 公共契约](docs/specifications/service-identity-and-scope-contract.md) · [P0 遥测入站契约草案](docs/specifications/p0-telemetry-contract.md) · [北向接口与订阅契约](docs/specifications/northbound-api-and-subscription-contract.md) · [技术可行性验证计划](docs/development/feasibility-plan.md)。
 
 ## P0 数据链路
 

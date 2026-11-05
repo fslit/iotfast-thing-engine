@@ -17,6 +17,12 @@
 | 旧版控制与确认设计 | 9、13、18、27；仅供上层控制系统参考，不属本引擎 |
 | 前端交互与研发验收 | 14–16、26–28 |
 
+服务身份认证、可信数据范围（Scope）、确定性 ID / 幂等摘要、状态消息分离与统一错误码参见 [服务身份、可信数据范围与 D00 公共契约设计](service-identity-and-scope-contract.md)。
+
+南向工程值遥测上报、原子校验、ACK 语义与去重规则参见 [P0 遥测入站接口契约草案](p0-telemetry-contract.md)。
+
+控制面（产品 / 模型 / 资产 / 绑定）与北向数据面（资源目录、设备视图、实时影子、WebSocket 快照衔接订阅、受限历史查询）参见 [北向标准接口、实时订阅与历史查询契约设计](northbound-api-and-subscription-contract.md)。
+
 模型复用、数据来源和资产关系参见 [资产模板与数据引用设计](asset-template-and-source-reference.md)。
 
 产品概念与落地取舍参见 [IDMP 理念评估与本引擎应用设计](../architecture/idmp-reference-assessment.md)。
@@ -25,7 +31,7 @@
 
 外部数据库的统一接口、能力协商与差异扩展参见 [TSDB 共性与异性接口设计](tsdb-common-extension-interface.md)。
 
-多时序库的适配、持久确认、同步和查询能力差异，参见 [时序数据库接入与数据一致性设计](timeseries-storage.md)。该文是总体设计的细化，适配器能力以实际版本验证为准。
+多时序库的适配、持久确认、同步和查询能力差异，参见 [时序数据库接入与数据一致性设计](timeseries-storage.md) 与 [存储适配器与可靠投递详细契约](storage-adapter-contract.md)。该文是总体设计的细化，适配器能力以实际版本验证为准。
 
 OEE、能耗和衍生指标与模型的结合参见 [衍生指标与算法设计](derived-metrics-oee-energy.md)。
 
