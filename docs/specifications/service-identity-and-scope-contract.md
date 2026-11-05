@@ -64,7 +64,7 @@
 2. **动作白名单**：当前 API 所需动作必须包含在 `allowed_actions` 中，否则返回 `403 FORBIDDEN_ACTION`。
 3. **资源交集/并集判定**：
    - 对 `southbound_source`：仅允许操作 `context.source_id == payload.source_id` 且在当前有效 `source_device_grant` 内的 `device_id`。
-   - 对北向与管理类调用：`scope_filter` 中非空维度（`asset_ids`、`device_ids`、`resource_ids`、`uri_prefixes`）共同组成可访问资源集合；若所有范围维度均为空且未显式声明租户级全量标志 `tenant_wide: true`，按 **空范围（拒绝一切资源）** 处理。
+   - 对北向与管理类调用：`scope_filter` 中非空维度（`asset_ids`、`device_ids`、`resource_ids`、`uri_prefixes`）按明确的并集语义组成可访问资源集合，再与租户和动作范围求交；若所有范围维度均为空且未显式声明租户级全量标志 `tenant_wide: true`，按 **空范围（拒绝一切资源）** 处理。
    - `uri_prefixes` 仅按规范化后的路径段边界匹配（例如 `uns://8iic/plant-a/` 匹配 `uns://8iic/plant-a/pump-001`，绝不匹配 `uns://8iic/plant-ab/pump-001`）。
 
 ## 3. 范围过滤、隐匿策略与长连接生命周期
@@ -72,7 +72,7 @@
 | 访问方式 | 越权或超范围行为 | 设计理由 |
 |---|---|---|
 | 按 ID 单点读取 (`GET /v1/devices/{id}`、`/view`、`/shadow`、`GET /v1/resources/{id}`) | 统一返回 `404 RESOURCE_NOT_FOUND`（或部署统一配置的隐匿响应），不区分“ID 不存在”与“存在但无范围权限” | 防止调用方通过枚举 ID 探测其他产线或租户的设备存在性 |
-| 批量读取 / 历史查询 (`POST /v1/history/query`、批量 latest) | 若请求显式指定了不在授权范围内的 `resource_id`，整次请求返回 `404 RESOURCE_NOT_FOUND`（附越权/未知 ID 列表），不静默丢弃部分 ID 后返回看似完整的成功结果 | 避免上层报表或算法因静默漏点算出错误汇总 |
+| 批量读取 / 历史查询 (`POST /v1/history/query`、批量 latest) | 若请求显式指定了不在授权范围内的 `resource_id`，整次请求返回 `404 RESOURCE_NOT_FOUND`（不得区分或回显越权与不存在的 ID），不静默丢弃部分 ID 后返回看似完整的成功结果 | 避免上层报表或算法因静默漏点算出错误汇总 |
 | 目录浏览 / 搜索 (`GET /v1/resources`、`browse_resources`、`search_resources`) | 先在存储/索引层应用 `VerifiedScopeContext` 过滤，再做关键词匹配、排序与分页；不返回范围外节点计数 | 满足总体设计 25.1 节“权限过滤必须先于检索与排序” |
 | 南向遥测 / 状态上报 (`POST /v1/telemetry`、`POST /v1/source-state`) | `source_id` 或 `device_id` 未授权时返回 `403 SOURCE_NOT_AUTHORIZED`，整消息拒绝 | 明确向网关暴露配置或授权异常 |
 | 缓存与游标 (`cursor`) | 所有读缓存 key 与分页 `cursor` 签名必须绑定 `(tenant_id, scope_hash)` | 防止不同范围的请求复用缓存或交换游标越权翻页 |
@@ -93,7 +93,7 @@
 | `message_id` | 可打印 ASCII（`0x21..0x7E`），长度 1–128 | 网关/来源生成；同一重试周期内固定 |
 | `source_epoch` | ASCII `[A-Za-z0-9_.:-]{1,64}` | 来源序列纪元；同次重试不变，重启若无法恢复序列则必须更换新 epoch |
 | `message_key` | 四元组 `(tenant_id, source_id, source_epoch, message_id)` | 入站鉴权后确定，作为幂等去重唯一键 |
-| `observation_id` | `"obs-" + Base32LowerNoPad(SHA-256("iotfast.obs.v1\0" + tenant_id + "\0" + source_id + "\0" + source_epoch + "\0" + message_id + "\0" + property)[0..16])` | 由已通过校验的 `message_key` 与点位 `property` 确定性派生（或首次入 WAL 前生成并固化入 WAL）；**严禁在重放或跨目标投递时重新生成不同 ID** |
+| `observation_id` | `"obs-" + Base32LowerNoPad(SHA-256("iotfast.obs.v1\0" + tenant_id + "\0" + source_id + "\0" + source_epoch + "\0" + message_id + "\0" + property)[0..16])` | 由已通过校验的 `message_key` 与点位 `property` 确定性派生（首次入 WAL 前确定性派生并固化入 WAL）；**严禁在重放或跨目标投递时重新生成不同 ID** |
 | `wal_position` | 固定宽度可比较格式 `"{segment_no:016x}:{record_offset:016x}"` | 按 `(segment_no, record_offset)` 无符号 64 位整数顺序比较，不按任意可变长字符串比较 |
 
 说明：采用基于 `(message_key, property)` 的确定性 `observation_id` 派生（辅以 WAL 固化记录）可确保网关超时重试、WAL 崩溃重放以及多时序库投递对同一测量点始终得出完全一致的 `observation_id`。
@@ -113,7 +113,7 @@
    - 服务端生成的 `received_at_ms`、`ingest_id`、`wal_position`。
 4. **数值与类型规范化**：
    - `bool` 为字面量 `true` / `false`；`int64` 为不带前导零的十进制整数字符串；
-   - `float64` 拒绝 `NaN` / `±Infinity`；`-0.0` 规范化为 `0`；按照 IEEE 754 双精度遵循 RFC 8785 最短精确十进制表示（或在引擎入站时保留原始已校验十进制字面量与 IEEE 754 位模式双重校验，同一协议版本内固定唯一实现并附跨语言测试向量）。
+   - `float64` 拒绝 `NaN` / `±Infinity`；`-0.0` 规范化为 `0`；按照 IEEE 754 双精度遵循 RFC 8785 最短精确十进制表示；同一协议版本固定唯一实现并附跨语言测试向量。
 
 ## 5. 时间来源词表、序列号与时钟漂移规则
 
@@ -137,14 +137,14 @@
 
 ## 6. 数值测量消息与连接/质量状态事件分离契约
 
-总体设计第 22.1 节与测试向量 `T06` 规定：**“连接超时、无新测量值时，点位质量转 bad，`last_known_value` 保留旧采样时间，不伪造新测量”**。为在 wire schema 层彻底消除歧义，D00 明确将**数值测量上报**与**来源/点位状态事件上报**分离：
+总体设计第 22.1 节与测试向量 `T06` 规定：**“连接超时、无新测量值时，有具体点位错误证据时点位质量转 bad，`last_known_value` 保留旧采样时间，不伪造新测量”**。为在 wire schema 层彻底消除歧义，D00 明确将**数值测量上报**与**来源/点位状态事件上报**分离：
 
 1. **数值测量消息（`POST /v1/telemetry`，`spec = "iotfast.telemetry.v1"`）**：
-   - 每个 `points[]` 必须携带符合模型类型的非空工程值 `value`（`value: null` 在测量消息中一律返回 `422 INVALID_POINT_VALUE`）。
-   - 允许上报带实际工程值的 `good` 或 `uncertain` 测量（例如传感器仍在输出读数但校准存疑时，`value: 245.6, quality.state: "uncertain"`）。
+   - 每个 `points[]` 必须携带符合模型类型的非空工程值 `value`（`value: null` 在测量消息中一律返回 `422 VALIDATION_FAILED`（`details.issue = INVALID_POINT_VALUE`））。
+   - 存在实际工程值时，采样质量可为 `good`、`uncertain`、`bad` 或 `unknown`；质量表示该次采样可信度，并不因为带值就推定为 `good`。无新测量值的故障通过状态事件表达。
 2. **连接与质量状态事件消息（`POST /v1/source-state`，`spec = "iotfast.source_state.v1"`）**：
    - 当网关发生 Modbus 读超时、设备断连、协议异常或恢复连接，且**没有产生新的工程测量值**时，通过状态事件上报。
-   - 服务端处理逻辑：仅更新 `point_quality_state`（设置 `quality_state = "bad"`、`quality_reason = "comm_timeout"`、`quality_observed_at_ms`、`source_connection_state = "disconnected"`）并追加 `quality_event` 表；**不向 `history_observation` 插入虚假数值行，也不覆盖 `latest_value` 中的 `value` 与 `value_sampled_at_ms`**。
+   - 服务端处理逻辑：根据事件粒度和可信证据更新连接状态；仅有具体点位错误证据时才更新其 `point_quality_state` 和追加 `quality_event`；**不向 `history_observation` 插入虚假数值行，也不覆盖 `latest_value` 中的 `value` 与 `value_sampled_at_ms`**。
 
 ### 状态事件上报示例 (`POST /v1/source-state`)
 
