@@ -161,7 +161,7 @@
 
 1. **客户端发送 `subscribe`**：指定 `client_sub_id` 与过滤条件（`device_ids`、`resource_ids` 或受控 `uri_prefixes`，必须全部位于当前 `VerifiedScopeContext` 范围内）。
 2. **服务端注册订阅并锁定边界 `S`**：在实时状态内存/有序域原子记录当前序号 `S`，并将 `stream_seq > S` 的匹配更新放入该订阅的有界增量缓冲队列。
-3. **服务端发送 `snapshot_begin` 与 `snapshot_chunk`**：输出与边界 `S` 一致的资源当前状态快照（若某资源在生成快照时已推进到 `seq_r <= S` 则直接体现；若在快照读取时已推进到 `seq_r > S`，客户端可通过后续 `delta` 幂等收敛到最新 `resource_revision`）。
+3. **服务端发送 `snapshot_begin` 与 `snapshot_chunk`**：输出边界 `S` 的一致资源快照，每个资源快照版本必须 `seq_r <= S`；以有界状态复制或版本快照实现。若无法读取 S 时的版本或缓冲溢出，终止本轮并返回 `resync_required`；不能混入 `seq_r > S` 的状态并称为 S 快照。
 4. **服务端发送 `snapshot_end`**：携带 `boundary_seq: S`，标志快照阶段完成。
 5. **服务端发送 `delta` 流**：依次排空缓冲队列及后续新到达的 `stream_seq > S` 增量事件。
 
@@ -275,7 +275,9 @@
   "partial": false,
   "warnings": [],
   "coverage": {
-    "contiguous_watermark_ms": 1793869200000,
+    "contiguous_wal_position": null,
+    "event_time_complete_through_ms": null,
+    "event_time_completeness": "unknown",
     "known_gaps": []
   },
   "items": [
@@ -301,6 +303,8 @@
   "next_cursor": null
 }
 ```
+
+WAL 连续位置只表示日志处理进度，不能证明事件时间上再无迟到数据；只有来源与迟到策略能够提供可验证的完整性时才返回 `event_time_complete_through_ms`，否则为 `null` / `unknown`。
 
 分页游标（`next_cursor`）经过服务端签名，内部绑定 `(tenant_id, scope_hash, query_fingerprint, snapshot_boundary, last_source_at_ms, last_observation_id)`；篡改游标或切换调用范围后重放游标返回 `422 VALIDATION_FAILED`。当存在 `delivery_gap` 或外部库部分不可达时，`partial` 设为 `true` 并在 `coverage.known_gaps` 中列出受影响时间区间与原因。
 
