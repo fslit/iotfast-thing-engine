@@ -1,0 +1,323 @@
+{
+  "spec": "iotfast.d00.golden_vectors.v1",
+  "algorithm": "sha256-jcs-v1",
+  "observation_id_prefix": "iotfast.obs.v1\\0",
+  "generated_by": "f1_d00_contract (Rust)",
+  "vectors": [
+    {
+      "vector_id": "GV-01-BASELINE-T01",
+      "description": "Single float64 engineering value 245.6 (T01 baseline, replayed=false)",
+      "spec": "iotfast.telemetry.v1",
+      "tenant_id": "ten-8iic",
+      "source_id": "gateway-01",
+      "source_epoch": "epoch-001",
+      "message_id": "m-20261105-000001",
+      "device_id": "dev-oven-02",
+      "model_revision_id": "mr-oven-1",
+      "binding_revision_id": "br-oven-12",
+      "request_id_header": "req-001",
+      "points": [
+        {
+          "property": "zone1_temp",
+          "value_type": "float64",
+          "value": 245.6,
+          "source_at_ms": 1793869200120,
+          "source_time_origin": "gateway_sample",
+          "source_seq": "1001",
+          "quality_state": "good",
+          "quality_source_protocol": "modbus",
+          "quality_source_code": null,
+          "delivery_replayed": false
+        }
+      ],
+      "expected_canonical_jcs": "{\"binding_revision_id\":\"br-oven-12\",\"device_id\":\"dev-oven-02\",\"model_revision_id\":\"mr-oven-1\",\"points\":[{\"property\":\"zone1_temp\",\"quality\":{\"source_code\":null,\"source_protocol\":\"modbus\",\"state\":\"good\"},\"source_at_ms\":1793869200120,\"source_seq\":\"1001\",\"source_time_origin\":\"gateway_sample\",\"value\":245.6,\"value_type\":\"float64\"}],\"source_epoch\":\"epoch-001\",\"source_id\":\"gateway-01\",\"spec\":\"iotfast.telemetry.v1\",\"tenant_id\":\"ten-8iic\"}",
+      "expected_payload_hash": "sha256:dc89fe0d45b22e9d33aa5982077fc0683a6963d74c755239ede3a857527de630",
+      "expected_observation_ids": {
+        "zone1_temp": "obs-hzg4jz6lu5qzfhygt5o3wtyrpi"
+      }
+    },
+    {
+      "vector_id": "GV-02-REPLAY-INVARIANCE-SC04",
+      "description": "Same message as GV-01 but delivery.replayed=true and different X-Request-Id; must yield identical canonical_jcs, payload_hash, and observation_id",
+      "spec": "iotfast.telemetry.v1",
+      "tenant_id": "ten-8iic",
+      "source_id": "gateway-01",
+      "source_epoch": "epoch-001",
+      "message_id": "m-20261105-000001",
+      "device_id": "dev-oven-02",
+      "model_revision_id": "mr-oven-1",
+      "binding_revision_id": "br-oven-12",
+      "request_id_header": "req-retry-999",
+      "points": [
+        {
+          "property": "zone1_temp",
+          "value_type": "float64",
+          "value": 245.6,
+          "source_at_ms": 1793869200120,
+          "source_time_origin": "gateway_sample",
+          "source_seq": "1001",
+          "quality_state": "good",
+          "quality_source_protocol": "modbus",
+          "quality_source_code": null,
+          "delivery_replayed": true
+        }
+      ],
+      "expected_canonical_jcs": "{\"binding_revision_id\":\"br-oven-12\",\"device_id\":\"dev-oven-02\",\"model_revision_id\":\"mr-oven-1\",\"points\":[{\"property\":\"zone1_temp\",\"quality\":{\"source_code\":null,\"source_protocol\":\"modbus\",\"state\":\"good\"},\"source_at_ms\":1793869200120,\"source_seq\":\"1001\",\"source_time_origin\":\"gateway_sample\",\"value\":245.6,\"value_type\":\"float64\"}],\"source_epoch\":\"epoch-001\",\"source_id\":\"gateway-01\",\"spec\":\"iotfast.telemetry.v1\",\"tenant_id\":\"ten-8iic\"}",
+      "expected_payload_hash": "sha256:dc89fe0d45b22e9d33aa5982077fc0683a6963d74c755239ede3a857527de630",
+      "expected_observation_ids": {
+        "zone1_temp": "obs-hzg4jz6lu5qzfhygt5o3wtyrpi"
+      }
+    },
+    {
+      "vector_id": "GV-03-TAMPERED-VALUE-SC05",
+      "description": "Same message_key as GV-01 but temperature altered to 245.7; must yield identical observation_id but different payload_hash (409 IDEMPOTENCY_CONFLICT)",
+      "spec": "iotfast.telemetry.v1",
+      "tenant_id": "ten-8iic",
+      "source_id": "gateway-01",
+      "source_epoch": "epoch-001",
+      "message_id": "m-20261105-000001",
+      "device_id": "dev-oven-02",
+      "model_revision_id": "mr-oven-1",
+      "binding_revision_id": "br-oven-12",
+      "request_id_header": "req-003",
+      "points": [
+        {
+          "property": "zone1_temp",
+          "value_type": "float64",
+          "value": 245.7,
+          "source_at_ms": 1793869200120,
+          "source_time_origin": "gateway_sample",
+          "source_seq": "1001",
+          "quality_state": "good",
+          "quality_source_protocol": "modbus",
+          "quality_source_code": null,
+          "delivery_replayed": false
+        }
+      ],
+      "expected_canonical_jcs": "{\"binding_revision_id\":\"br-oven-12\",\"device_id\":\"dev-oven-02\",\"model_revision_id\":\"mr-oven-1\",\"points\":[{\"property\":\"zone1_temp\",\"quality\":{\"source_code\":null,\"source_protocol\":\"modbus\",\"state\":\"good\"},\"source_at_ms\":1793869200120,\"source_seq\":\"1001\",\"source_time_origin\":\"gateway_sample\",\"value\":245.7,\"value_type\":\"float64\"}],\"source_epoch\":\"epoch-001\",\"source_id\":\"gateway-01\",\"spec\":\"iotfast.telemetry.v1\",\"tenant_id\":\"ten-8iic\"}",
+      "expected_payload_hash": "sha256:f7a5704efc9e03ba5e60b53287e3b83baffd5753fc5d076df72be750b7f938fe",
+      "expected_observation_ids": {
+        "zone1_temp": "obs-hzg4jz6lu5qzfhygt5o3wtyrpi"
+      }
+    },
+    {
+      "vector_id": "GV-04-MULTIPOINT-ORDER-A",
+      "description": "Multi-point message with properties [zone2_temp, conveyor_speed_rpm, alarm_active] in unsorted input order",
+      "spec": "iotfast.telemetry.v1",
+      "tenant_id": "ten-8iic",
+      "source_id": "gateway-01",
+      "source_epoch": "epoch-001",
+      "message_id": "m-20261105-000002",
+      "device_id": "dev-oven-02",
+      "model_revision_id": "mr-oven-1",
+      "binding_revision_id": "br-oven-12",
+      "request_id_header": "req-004a",
+      "points": [
+        {
+          "property": "zone2_temp",
+          "value_type": "float64",
+          "value": 250.0,
+          "source_at_ms": 1793869201000,
+          "source_time_origin": "gateway_sample",
+          "source_seq": "1002",
+          "quality_state": "good",
+          "quality_source_protocol": "modbus",
+          "quality_source_code": null,
+          "delivery_replayed": false
+        },
+        {
+          "property": "conveyor_speed_rpm",
+          "value_type": "int64",
+          "value": 1200,
+          "source_at_ms": 1793869201000,
+          "source_time_origin": "gateway_sample",
+          "source_seq": "1002",
+          "quality_state": "good",
+          "quality_source_protocol": "modbus",
+          "quality_source_code": null,
+          "delivery_replayed": false
+        },
+        {
+          "property": "alarm_active",
+          "value_type": "bool",
+          "value": false,
+          "source_at_ms": 1793869201000,
+          "source_time_origin": "gateway_sample",
+          "source_seq": "1002",
+          "quality_state": "good",
+          "quality_source_protocol": "modbus",
+          "quality_source_code": null,
+          "delivery_replayed": false
+        }
+      ],
+      "expected_canonical_jcs": "{\"binding_revision_id\":\"br-oven-12\",\"device_id\":\"dev-oven-02\",\"model_revision_id\":\"mr-oven-1\",\"points\":[{\"property\":\"alarm_active\",\"quality\":{\"source_code\":null,\"source_protocol\":\"modbus\",\"state\":\"good\"},\"source_at_ms\":1793869201000,\"source_seq\":\"1002\",\"source_time_origin\":\"gateway_sample\",\"value\":false,\"value_type\":\"bool\"},{\"property\":\"conveyor_speed_rpm\",\"quality\":{\"source_code\":null,\"source_protocol\":\"modbus\",\"state\":\"good\"},\"source_at_ms\":1793869201000,\"source_seq\":\"1002\",\"source_time_origin\":\"gateway_sample\",\"value\":1200,\"value_type\":\"int64\"},{\"property\":\"zone2_temp\",\"quality\":{\"source_code\":null,\"source_protocol\":\"modbus\",\"state\":\"good\"},\"source_at_ms\":1793869201000,\"source_seq\":\"1002\",\"source_time_origin\":\"gateway_sample\",\"value\":250,\"value_type\":\"float64\"}],\"source_epoch\":\"epoch-001\",\"source_id\":\"gateway-01\",\"spec\":\"iotfast.telemetry.v1\",\"tenant_id\":\"ten-8iic\"}",
+      "expected_payload_hash": "sha256:4b080e9213620a2dfb7e95e951274e441c8426706ece6bce44f2717af98944dc",
+      "expected_observation_ids": {
+        "alarm_active": "obs-ynmh4pkdjcodlbi5qnbdnrnlsa",
+        "conveyor_speed_rpm": "obs-623g3vzvncpguwfrg7ubalw5dq",
+        "zone2_temp": "obs-3fwp3nmtm7zadq2n2esxyxtzbi"
+      }
+    },
+    {
+      "vector_id": "GV-05-MULTIPOINT-ORDER-B",
+      "description": "Same multi-point message as GV-04 with input points array reversed and replayed=true; must produce identical canonical_jcs and payload_hash",
+      "spec": "iotfast.telemetry.v1",
+      "tenant_id": "ten-8iic",
+      "source_id": "gateway-01",
+      "source_epoch": "epoch-001",
+      "message_id": "m-20261105-000002",
+      "device_id": "dev-oven-02",
+      "model_revision_id": "mr-oven-1",
+      "binding_revision_id": "br-oven-12",
+      "request_id_header": "req-004b",
+      "points": [
+        {
+          "property": "alarm_active",
+          "value_type": "bool",
+          "value": false,
+          "source_at_ms": 1793869201000,
+          "source_time_origin": "gateway_sample",
+          "source_seq": "1002",
+          "quality_state": "good",
+          "quality_source_protocol": "modbus",
+          "quality_source_code": null,
+          "delivery_replayed": true
+        },
+        {
+          "property": "conveyor_speed_rpm",
+          "value_type": "int64",
+          "value": 1200,
+          "source_at_ms": 1793869201000,
+          "source_time_origin": "gateway_sample",
+          "source_seq": "1002",
+          "quality_state": "good",
+          "quality_source_protocol": "modbus",
+          "quality_source_code": null,
+          "delivery_replayed": true
+        },
+        {
+          "property": "zone2_temp",
+          "value_type": "float64",
+          "value": 250.0,
+          "source_at_ms": 1793869201000,
+          "source_time_origin": "gateway_sample",
+          "source_seq": "1002",
+          "quality_state": "good",
+          "quality_source_protocol": "modbus",
+          "quality_source_code": null,
+          "delivery_replayed": true
+        }
+      ],
+      "expected_canonical_jcs": "{\"binding_revision_id\":\"br-oven-12\",\"device_id\":\"dev-oven-02\",\"model_revision_id\":\"mr-oven-1\",\"points\":[{\"property\":\"alarm_active\",\"quality\":{\"source_code\":null,\"source_protocol\":\"modbus\",\"state\":\"good\"},\"source_at_ms\":1793869201000,\"source_seq\":\"1002\",\"source_time_origin\":\"gateway_sample\",\"value\":false,\"value_type\":\"bool\"},{\"property\":\"conveyor_speed_rpm\",\"quality\":{\"source_code\":null,\"source_protocol\":\"modbus\",\"state\":\"good\"},\"source_at_ms\":1793869201000,\"source_seq\":\"1002\",\"source_time_origin\":\"gateway_sample\",\"value\":1200,\"value_type\":\"int64\"},{\"property\":\"zone2_temp\",\"quality\":{\"source_code\":null,\"source_protocol\":\"modbus\",\"state\":\"good\"},\"source_at_ms\":1793869201000,\"source_seq\":\"1002\",\"source_time_origin\":\"gateway_sample\",\"value\":250,\"value_type\":\"float64\"}],\"source_epoch\":\"epoch-001\",\"source_id\":\"gateway-01\",\"spec\":\"iotfast.telemetry.v1\",\"tenant_id\":\"ten-8iic\"}",
+      "expected_payload_hash": "sha256:4b080e9213620a2dfb7e95e951274e441c8426706ece6bce44f2717af98944dc",
+      "expected_observation_ids": {
+        "alarm_active": "obs-ynmh4pkdjcodlbi5qnbdnrnlsa",
+        "conveyor_speed_rpm": "obs-623g3vzvncpguwfrg7ubalw5dq",
+        "zone2_temp": "obs-3fwp3nmtm7zadq2n2esxyxtzbi"
+      }
+    },
+    {
+      "vector_id": "GV-06-JCS-FLOAT-AND-STRING-EDGES",
+      "description": "RFC 8785 JCS edge cases: -0.0 normalized to 0, 0.42 fractional, 1e-6 decimal vs 1e-7 exponential, and escaped string text",
+      "spec": "iotfast.telemetry.v1",
+      "tenant_id": "ten-8iic",
+      "source_id": "gateway-02",
+      "source_epoch": "epoch-2026.11:01",
+      "message_id": "m-edge-0001",
+      "device_id": "pump-001",
+      "model_revision_id": "pump-model-r1",
+      "binding_revision_id": "pump-001-bind-r1",
+      "request_id_header": "req-edge-01",
+      "points": [
+        {
+          "property": "zero_drift",
+          "value_type": "float64",
+          "value": 0.0,
+          "source_at_ms": 1793869300000,
+          "source_time_origin": "device_clock",
+          "source_seq": "18446744073709551615",
+          "quality_state": "good",
+          "quality_source_protocol": "opcua",
+          "quality_source_code": "0x00000000",
+          "delivery_replayed": false
+        },
+        {
+          "property": "outlet_pressure",
+          "value_type": "float64",
+          "value": 0.42,
+          "source_at_ms": 1793869300000,
+          "source_time_origin": "device_clock",
+          "source_seq": "18446744073709551615",
+          "quality_state": "uncertain",
+          "quality_source_protocol": "opcua",
+          "quality_source_code": "SubNormal",
+          "delivery_replayed": false
+        },
+        {
+          "property": "micro_vibration",
+          "value_type": "float64",
+          "value": 1e-7,
+          "source_at_ms": 1793869300000,
+          "source_time_origin": "device_clock",
+          "source_seq": "18446744073709551615",
+          "quality_state": "good",
+          "quality_source_protocol": null,
+          "quality_source_code": null,
+          "delivery_replayed": false
+        },
+        {
+          "property": "batch_label",
+          "value_type": "text",
+          "value": "line-\"A\"\\shift\n01",
+          "source_at_ms": 1793869300000,
+          "source_time_origin": "device_clock",
+          "source_seq": "18446744073709551615",
+          "quality_state": "good",
+          "quality_source_protocol": null,
+          "quality_source_code": null,
+          "delivery_replayed": false
+        }
+      ],
+      "expected_canonical_jcs": "{\"binding_revision_id\":\"pump-001-bind-r1\",\"device_id\":\"pump-001\",\"model_revision_id\":\"pump-model-r1\",\"points\":[{\"property\":\"batch_label\",\"quality\":{\"source_code\":null,\"source_protocol\":null,\"state\":\"good\"},\"source_at_ms\":1793869300000,\"source_seq\":\"18446744073709551615\",\"source_time_origin\":\"device_clock\",\"value\":\"line-\\\"A\\\"\\\\shift\\n01\",\"value_type\":\"text\"},{\"property\":\"micro_vibration\",\"quality\":{\"source_code\":null,\"source_protocol\":null,\"state\":\"good\"},\"source_at_ms\":1793869300000,\"source_seq\":\"18446744073709551615\",\"source_time_origin\":\"device_clock\",\"value\":1e-7,\"value_type\":\"float64\"},{\"property\":\"outlet_pressure\",\"quality\":{\"source_code\":\"SubNormal\",\"source_protocol\":\"opcua\",\"state\":\"uncertain\"},\"source_at_ms\":1793869300000,\"source_seq\":\"18446744073709551615\",\"source_time_origin\":\"device_clock\",\"value\":0.42,\"value_type\":\"float64\"},{\"property\":\"zero_drift\",\"quality\":{\"source_code\":\"0x00000000\",\"source_protocol\":\"opcua\",\"state\":\"good\"},\"source_at_ms\":1793869300000,\"source_seq\":\"18446744073709551615\",\"source_time_origin\":\"device_clock\",\"value\":0,\"value_type\":\"float64\"}],\"source_epoch\":\"epoch-2026.11:01\",\"source_id\":\"gateway-02\",\"spec\":\"iotfast.telemetry.v1\",\"tenant_id\":\"ten-8iic\"}",
+      "expected_payload_hash": "sha256:c5daef460795004023469e7b3fbbd12bfdf8af52621f6af594e67215167465f9",
+      "expected_observation_ids": {
+        "batch_label": "obs-kjuyt7fzhrp3eytrywwyiuanza",
+        "micro_vibration": "obs-6ulkopt7vpg3g46acvk64wwlfq",
+        "outlet_pressure": "obs-w3iiu4vypghwn3fj53dm64ff6i",
+        "zero_drift": "obs-qq4a7klx652gi5wdu3nbdppwqi"
+      }
+    },
+    {
+      "vector_id": "GV-07-PR2-PROBE-SAMPLE",
+      "description": "PR #2 blueprint §4.4 probe sample (ten-8iic / gateway-01 / epoch-001 / msg-001 / outlet_pressure=0.42)",
+      "spec": "iotfast.telemetry.v1",
+      "tenant_id": "ten-8iic",
+      "source_id": "gateway-01",
+      "source_epoch": "epoch-001",
+      "message_id": "msg-001",
+      "device_id": "pump-001",
+      "model_revision_id": "pump-model-r1",
+      "binding_revision_id": "pump-bind-r1",
+      "request_id_header": "req-pr2-probe",
+      "points": [
+        {
+          "property": "outlet_pressure",
+          "value_type": "float64",
+          "value": 0.42,
+          "source_at_ms": 1700000000000,
+          "source_time_origin": "gateway_sample",
+          "source_seq": "42",
+          "quality_state": "good",
+          "quality_source_protocol": null,
+          "quality_source_code": null,
+          "delivery_replayed": true
+        }
+      ],
+      "expected_canonical_jcs": "{\"binding_revision_id\":\"pump-bind-r1\",\"device_id\":\"pump-001\",\"model_revision_id\":\"pump-model-r1\",\"points\":[{\"property\":\"outlet_pressure\",\"quality\":{\"source_code\":null,\"source_protocol\":null,\"state\":\"good\"},\"source_at_ms\":1700000000000,\"source_seq\":\"42\",\"source_time_origin\":\"gateway_sample\",\"value\":0.42,\"value_type\":\"float64\"}],\"source_epoch\":\"epoch-001\",\"source_id\":\"gateway-01\",\"spec\":\"iotfast.telemetry.v1\",\"tenant_id\":\"ten-8iic\"}",
+      "expected_payload_hash": "sha256:8d7e884478d3420105475344f4b63187e937741eb68df08832b39b47e8958eae",
+      "expected_observation_ids": {
+        "outlet_pressure": "obs-mfwh4ejs2b7rtlcyzrqkyufufa"
+      }
+    }
+  ]
+}

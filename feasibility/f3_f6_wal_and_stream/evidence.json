@@ -1,0 +1,100 @@
+{
+  "environment": {
+    "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+    "os": "Darwin 27.0.0 arm64 (macOS)",
+    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "sync_policy": "SyncAll (File::sync_all + parent directory sync_all)"
+  },
+  "executed_at": "2026-11-06",
+  "f3_wal_verification": {
+    "cases": {
+      "F01_before_wal_write": {
+        "behavior": "0 bytes written on crash; client retry with original key produces 202 accepted_durable and 1 history observation (245.6)",
+        "status": "PASS"
+      },
+      "F02_partial_tail_frame_before_sync": {
+        "behavior": "Recovery detects trailing incomplete frame, truncates segment to exact offset of last durable record, preserves prior durable records, and accepts client retry for tail message",
+        "status": "PASS"
+      },
+      "F03_after_fsync_before_ack": {
+        "behavior": "Recovery replays synced WAL record into DB and restores dedup index; client retry with same key returns HTTP 200 duplicate with original ingest_id; conflicting payload returns HTTP 409 IDEMPOTENCY_CONFLICT (T04)",
+        "status": "PASS"
+      },
+      "F04_db_commit_and_checkpoint_lag": {
+        "behavior": "Uncommitted DB record is replayed from WAL; already committed DB record with lagging checkpoint is skipped via applied_messages (SkippedAlreadyApplied) and checkpoint advances without duplicate rows",
+        "status": "PASS"
+      },
+      "F05_middle_record_byte_corruption": {
+        "behavior": "CRC32/SHA-256 mismatch on middle record #2 halts replay immediately at record #2 offset, emits MiddleRecordCorrupted alert, sets HaltedOnWalCorruption, and refuses to silently skip to record #3",
+        "status": "PASS"
+      },
+      "T07_hard_watermark_backpressure": {
+        "behavior": "Exceeding soft watermark returns 202 accepted_durable with warning WAL_SOFT_WATERMARK_EXCEEDED; exceeding hard watermark with Prefer: durability=durable returns HTTP 503 DURABILITY_BACKPRESSURE (retryable=true) and never downgrades to accepted_volatile",
+        "status": "PASS"
+      }
+    },
+    "checksums": [
+      "CRC32 (crc32fast)",
+      "SHA-256 (sha2)"
+    ],
+    "frame_header_bytes": 48,
+    "sample_empty_record_frame_bytes": 527,
+    "wal_position_format": "{segment_no:016x}:{record_offset:016x} (33 ASCII bytes)"
+  },
+  "f6_subscription_verification": {
+    "all_deltas_strictly_greater_than_boundary": true,
+    "boundary_seq_locked": "40",
+    "concurrent_updates_during_snapshot": 160,
+    "delta_frames_applied": 160,
+    "final_replica_matches_server_100_percent": true,
+    "overflow_resync_test_t09_nb06": {
+      "emitted_code": "BUFFER_OVERFLOW",
+      "emitted_frame_type": "resync_required",
+      "injected_burst_updates": 24,
+      "max_pending_deltas": 16,
+      "post_reconnect_resync_converged": true,
+      "stream_terminated_immediately": true
+    },
+    "quality_timeout_retains_last_measurement_timestamp": true,
+    "status": "PASS",
+    "unauthorized_device_filtered_out": true,
+    "unbound_resource_null_value_preserved": true
+  },
+  "git_commit": "840c36f1b485266a595b6730aa5852b1b56ce126",
+  "st04_checkpoint_verification": {
+    "checkpoint_before_102_resolution": "0000000000000001:0000000000000065 (seq 101)",
+    "items_requiring_retry_after_restart": [
+      102
+    ],
+    "persisted_103_not_redelivered_on_restart": true,
+    "resolution_path_a_query_back": {
+      "checkpoint_after_reconcile": "0000000000000001:0000000000000067 (seq 103)",
+      "known_gaps_count": 0,
+      "partial": false
+    },
+    "resolution_path_b_authorized_gap": {
+      "checkpoint_after_authorized_gap": "0000000000000001:0000000000000067 (seq 103)",
+      "disclosed_gap_id": "gap-20261106-102",
+      "disclosed_observation_id": "obs-102",
+      "partial": true,
+      "unauthorized_skip_rejected": true,
+      "warnings": [
+        "DELIVERY_GAP_PRESENT"
+      ]
+    },
+    "sequence_tested": [
+      "101:committed",
+      "102:inflight->unknown",
+      "103:committed"
+    ],
+    "status": "PASS"
+  },
+  "suite": "f3_f6_wal_and_stream",
+  "summary": {
+    "all_passed": true,
+    "f3_wal_and_fault_injection_ms": 538.98,
+    "f6_snapshot_delta_subscription_ms": 1.13,
+    "st04_non_contiguous_checkpoint_ms": 93.05,
+    "total_elapsed_ms": 633.17
+  }
+}
