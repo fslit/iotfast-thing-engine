@@ -1,0 +1,16 @@
+[package]
+name = "iotfast-thing-engine"
+version = "0.1.0"
+edition = "2021"
+description = "IoT Thing Model & UNS Data Service Engine (P0 Core D01-D08)"
+
+[dependencies]
+crc32fast = "1.5"
+data-encoding = "2.11"
+duckdb = "1.20000.1"
+hex = "0.4"
+ryu = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+tempfile = "3.27"
