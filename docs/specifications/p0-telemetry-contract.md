@@ -47,7 +47,7 @@
 
 幂等范围由已鉴权 `tenant_id`、`source_id`、`source_epoch`、`message_id` 构成；服务端按 [D00 公共契约 4.2 节](service-identity-and-scope-contract.md#42-遥测业务摘要-payload_hash-canonicalization-规则) 的 `sha256-jcs-v1` 规范化规则对业务内容计算 `payload_hash`。`replayed`、`request_id`、服务端接收时间不属于摘要；相同 key 不同摘要返回 `409 IDEMPOTENCY_CONFLICT`。
 
-去重元数据及历史写入 / 策略状态须按设计要求在同一事务应用；在去重保留期外不得声称仍能识别重复。旧绑定消息的采样时期无法证明时隔离 / 拒绝，不能拿新倍率重算。
+去重元数据及历史写入 / 策略状态须按设计要求在同一事务应用；在去重保留期外不得声称仍能识别重复。调用方与 `source_device_grant` 校验通过后，先按 `message_key` 查已持久化去重记录：若该 `message_key` 已存在且 `payload_hash` 一致，即使当前设备 active 绑定此后已切换到新版本，也应直接返回 `200 duplicate` 与原 `ingest_id`（R08）；仅对未见过的 `message_key` 要求匹配当前有效绑定窗口，旧绑定新消息的采样时期无法证明时返回 `409 REVISION_CONFLICT` 或隔离，不能拿新倍率重算。
 
 ## 5. 示例与反例
 
