@@ -2,6 +2,8 @@
 
 状态：研发计划，待执行。规划基线：`fslit/iotfast-thing-engine` 的 main `c0a5a42d247c66e66e94475ad7a5d0abd210e1b3`（2026-11-06）。执行前必须读取最新 main、重算基线并检查本计划与当前代码的差异；不能在旧 SHA 上盲目覆盖新工作。本计划为实施顺序，不代表正式服务已完成。
 
+正式工程目录、逐文件职责和可领取任务卡详见 [AI 工程生成规范与任务拆解](ai-implementation-work-breakdown.md)。
+
 ## 0. 给 AI 的唯一入口
 
 先读本文件 → 仓库根目录 AGENTS.md → README.md 与 prototype/README.md → docs/architecture/data-engine-scope.md → docs/specifications/README.md → 本任务引用的具体规范和实际代码 / 测试 → 任务依赖和证据报告。代码、配置与运行结果均以当前目标分支为准；已合并 main、仅在 PR 的内容及本地改动必须分开报告。
