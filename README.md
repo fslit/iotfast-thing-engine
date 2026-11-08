@@ -16,6 +16,7 @@
 5. [P0 测试结论总结](docs/development/evidence/p0-core-engine-test-summary.md)
 6. [设计决策记录](docs/adr/0001-mvp-boundaries.md)
 7. [AI 开发工作规范](AGENTS.md)
+8. [AI 工程生成规范和任务拆解](docs/development/ai-implementation-work-breakdown.md)（含 F00–F11 工作包）
 
 补充规范：[服务身份与 D00 公共契约](docs/specifications/service-identity-and-scope-contract.md) · [P0 遥测入站契约](docs/specifications/p0-telemetry-contract.md) · [北向接口与订阅契约](docs/specifications/northbound-api-and-subscription-contract.md) · [D00 跨模块收敛蓝图](docs/specifications/d00-integrated-implementation-blueprint.md)
 
