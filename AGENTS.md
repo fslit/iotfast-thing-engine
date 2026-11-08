@@ -9,7 +9,7 @@
 
 ## AI 任务入口
 
-完成上述必读后，从 [AI 工程生成规范与任务拆解](docs/development/ai-implementation-work-breakdown.md) 选择单项任务，再读取该任务对应的工作包；首批任务从 F00-A 开始。已有计划和代码的状态以当前分支及任务证据为准。
+完成上述必读后，从 [AI 任务派发与验收入口](docs/development/ai-task-dispatch.md) 和 [AI 工程生成规范与任务拆解](docs/development/ai-implementation-work-breakdown.md) 选择单项任务，再读取该任务对应的工作包；首批任务从 F00-A 开始。已有计划和代码的状态以当前分支及任务证据为准。
 
 ## 架构边界
 
