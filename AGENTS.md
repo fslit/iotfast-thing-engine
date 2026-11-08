@@ -7,6 +7,10 @@
 3. 阅读 `docs/development/roadmap.md` 和 `docs/development/acceptance.md`，确认依赖、限制及验收条件。
 4. 查看现有代码、工作区和未提交改动，再拟定实施方案；不要将设计草案描述为已实现功能。
 
+## AI 任务入口
+
+完成上述必读后，从 [AI 工程生成规范与任务拆解](docs/development/ai-implementation-work-breakdown.md) 选择单项任务，再读取该任务对应的工作包；首批任务从 F00-A 开始。已有计划和代码的状态以当前分支及任务证据为准。
+
 ## 架构边界
 
 - 首个闭环只读，沿用已有网关采集；设备控制不能因示例或演示自动开启。
