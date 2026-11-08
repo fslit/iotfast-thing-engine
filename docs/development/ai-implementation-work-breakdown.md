@@ -2,7 +2,7 @@
 
 状态：设计提案，待执行；基线 main `c0a5a42d247c66e66e94475ad7a5d0abd210e1b3`（2026-11-06）。本文件是同分支 [AI 执行计划](ai-execution-plan.md) 的工程化细化，并非已存在的目录或功能。执行前核对最新 main、工作区、PR 和本文件状态。工程定位和契约以根目录 AGENTS.md、docs/specifications/README.md 指定的权威文件为准；发现冲突先记录并修订权威契约，不擅自改变既定语义。
 
-首批 F00–F02 的操作步骤、输出模板和逐文件检查见 [AI 开发首批工作包](ai-f00-f02-work-packages.md)；F03–F08 的契约、安全、数据和接口交付步骤见 [核心数据引擎工作包](ai-f03-f08-work-packages.md)。
+首批 F00–F02 的操作步骤、输出模板和逐文件检查见 [AI 开发首批工作包](ai-f00-f02-work-packages.md)；F03–F08 的契约、安全、数据和接口交付步骤见 [核心数据引擎工作包](ai-f03-f08-work-packages.md)；F09–F11 的联调、发布、外部时序库及指标见 [联调与扩展工作包](ai-f09-f11-work-packages.md)。
 
 ## 1. AI 启动与执行规则
 
