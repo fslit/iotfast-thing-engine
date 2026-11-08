@@ -6,7 +6,7 @@
 
 ## 0. 给 AI 的唯一入口
 
-先读本文件 → 仓库根目录 AGENTS.md → README.md 与 prototype/README.md → docs/architecture/data-engine-scope.md → docs/specifications/README.md → 本任务引用的具体规范和实际代码 / 测试 → 任务依赖和证据报告。代码、配置与运行结果均以当前目标分支为准；已合并 main、仅在 PR 的内容及本地改动必须分开报告。
+先读仓库根目录 AGENTS.md → 本文件 → README.md 与 prototype/README.md → docs/architecture/data-engine-scope.md → docs/specifications/README.md → 本任务引用的具体规范和实际代码 / 测试 → 任务依赖和证据报告。代码、配置与运行结果均以当前目标分支为准；已合并 main、仅在 PR 的内容及本地改动必须分开报告。
 
 用户目标：Rust 独立设备业务模型与数据服务，标准化设备和点位、latest / 质量、历史查询与订阅，供八位魔方 / SCADA / MES / EMS / AI 上层调用。P0 复用现有网关上报工程值；用户 / 角色 / 业务权限、页面、告警工作流、MCP Agent 和物理控制属于上层；引擎仍必须校验服务身份和可信数据范围，不能裸暴露。
 
