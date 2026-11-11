@@ -160,7 +160,8 @@ fn d05_d06_validates_telemetry_atomically_and_recovers_wal_f02_f05_t07() {
         },
     )
     .unwrap();
-    let b1_ready = BindingService::validate_binding(&conn, &m_ctx, &b1.binding_revision_id).unwrap();
+    let b1_ready =
+        BindingService::validate_binding(&conn, &m_ctx, &b1.binding_revision_id).unwrap();
     BindingService::activate_binding(
         &conn,
         &m_ctx,
@@ -217,14 +218,9 @@ fn d05_d06_validates_telemetry_atomically_and_recovers_wal_f02_f05_t07() {
             },
         ],
     };
-    let err_t02 = IngestService::validate_telemetry(
-        &conn,
-        &gw_ctx,
-        &msg_t02,
-        50_100,
-        cfg.max_future_skew_ms,
-    )
-    .unwrap_err();
+    let err_t02 =
+        IngestService::validate_telemetry(&conn, &gw_ctx, &msg_t02, 50_100, cfg.max_future_skew_ms)
+            .unwrap_err();
     assert_eq!(err_t02.code, ErrorCode::ValidationFailed);
     assert_eq!(err_t02.http_status(), 422);
 
@@ -263,45 +259,34 @@ fn d05_d06_validates_telemetry_atomically_and_recovers_wal_f02_f05_t07() {
     msg_t08.message_id = "m-t08".into();
     msg_t08.points.truncate(1);
     msg_t08.binding_revision_id = "br-oven-old".into();
-    let err_t08 = IngestService::validate_telemetry(
-        &conn,
-        &gw_ctx,
-        &msg_t08,
-        50_100,
-        cfg.max_future_skew_ms,
-    )
-    .unwrap_err();
+    let err_t08 =
+        IngestService::validate_telemetry(&conn, &gw_ctx, &msg_t08, 50_100, cfg.max_future_skew_ms)
+            .unwrap_err();
     assert_eq!(err_t08.code, ErrorCode::RevisionConflict);
 
     // Valid batch -> append to AppWal
     let mut msg_ok1 = msg_t02.clone();
     msg_ok1.message_id = "m-ok-1".into();
     msg_ok1.points.truncate(1);
-    let batch1 = IngestService::validate_telemetry(
-        &conn,
-        &gw_ctx,
-        &msg_ok1,
-        50_100,
-        cfg.max_future_skew_ms,
-    )
-    .unwrap();
+    let batch1 =
+        IngestService::validate_telemetry(&conn, &gw_ctx, &msg_ok1, 50_100, cfg.max_future_skew_ms)
+            .unwrap();
 
     let mut msg_ok2 = msg_ok1.clone();
     msg_ok2.message_id = "m-ok-2".into();
     msg_ok2.points[0].source_seq = "2".into();
     msg_ok2.points[0].value = json!(246.2);
-    let batch2 = IngestService::validate_telemetry(
-        &conn,
-        &gw_ctx,
-        &msg_ok2,
-        50_200,
-        cfg.max_future_skew_ms,
-    )
-    .unwrap();
+    let batch2 =
+        IngestService::validate_telemetry(&conn, &gw_ctx, &msg_ok2, 50_200, cfg.max_future_skew_ms)
+            .unwrap();
 
     let mut wal = AppWal::open(&cfg).unwrap();
-    let r1 = wal.append_durable(&batch1.to_wal_record("ing-001")).unwrap();
-    let r2 = wal.append_durable(&batch2.to_wal_record("ing-002")).unwrap();
+    let r1 = wal
+        .append_durable(&batch1.to_wal_record("ing-001"))
+        .unwrap();
+    let r2 = wal
+        .append_durable(&batch2.to_wal_record("ing-002"))
+        .unwrap();
     assert!(r1.wal_position < r2.wal_position);
 
     // F02: Append incomplete tail bytes to WAL segment -> scan_and_recover truncates tail cleanly

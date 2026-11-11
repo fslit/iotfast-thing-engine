@@ -201,6 +201,28 @@ pub fn derive_observation_id(
     format!("obs-{}", encoded)
 }
 
+/// Deterministic collision-free `resource_id` fallback (Q11):
+/// `"res-" + Base32LowerNoPad(SHA-256("iotfast.res.v1\0" + tenant_id + "\0" + device_id + "\0" + kind + "\0" + identifier)[0..16])`
+pub fn derive_resource_id(
+    tenant_id: &str,
+    device_id: &str,
+    kind: &str,
+    identifier: &str,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"iotfast.res.v1\0");
+    hasher.update(tenant_id.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(device_id.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(kind.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(identifier.as_bytes());
+    let digest = hasher.finalize();
+    let encoded = BASE32_NOPAD.encode(&digest[0..16]).to_ascii_lowercase();
+    format!("res-{}", encoded)
+}
+
 /// RFC 8785 (JCS) / ECMA-262 Number::toString canonical formatting for IEEE 754 f64.
 /// - Rejects NaN and ±Infinity.
 /// - Normalizes -0.0 and +0.0 to "0".
@@ -449,6 +471,57 @@ pub fn compute_jcs_v1_payload_hash(
     let payload_hash = format!("sha256:{}", digest_hex);
 
     Ok((canonical_json, payload_hash))
+}
+
+/// Computes `sha256-jcs-v1` canonical `event_hash` for `iotfast.source_state.v1` (Q04).
+pub fn compute_source_state_event_hash(
+    spec: &str,
+    tenant_id: &str,
+    source_id: &str,
+    source_epoch: &str,
+    device_id: &str,
+    binding_revision_id: &str,
+    observed_at_ms: i64,
+    source_time_origin: &str,
+    source_seq: &str,
+    connection_state: &str,
+    point_states: &[SourcePointStateWire],
+) -> (String, String) {
+    let mut sorted_pts: Vec<&SourcePointStateWire> = point_states.iter().collect();
+    sorted_pts.sort_by(|a, b| a.property.as_bytes().cmp(b.property.as_bytes()));
+
+    let mut pts_jcs = Vec::with_capacity(sorted_pts.len());
+    for pt in sorted_pts {
+        let pt_str = format!(
+            "{{\"property\":{},\"quality_reason\":{},\"quality_state\":{},\"source_code\":{},\"source_protocol\":{}}}",
+            format_jcs_string(&pt.property),
+            format_jcs_string(&pt.quality_reason),
+            format_jcs_string(&pt.quality_state),
+            format_jcs_opt_string(&pt.source_code),
+            format_jcs_opt_string(&pt.source_protocol),
+        );
+        pts_jcs.push(pt_str);
+    }
+
+    let canonical_json = format!(
+        "{{\"binding_revision_id\":{},\"connection_state\":{},\"device_id\":{},\"observed_at_ms\":{},\"point_states\":[{}],\"source_epoch\":{},\"source_id\":{},\"source_seq\":{},\"source_time_origin\":{},\"spec\":{},\"tenant_id\":{}}}",
+        format_jcs_string(binding_revision_id),
+        format_jcs_string(connection_state),
+        format_jcs_string(device_id),
+        observed_at_ms,
+        pts_jcs.join(","),
+        format_jcs_string(source_epoch),
+        format_jcs_string(source_id),
+        format_jcs_string(source_seq),
+        format_jcs_string(source_time_origin),
+        format_jcs_string(spec),
+        format_jcs_string(tenant_id),
+    );
+
+    let mut hasher = Sha256::new();
+    hasher.update(canonical_json.as_bytes());
+    let event_hash = format!("sha256:{}", hex::encode(hasher.finalize()));
+    (canonical_json, event_hash)
 }
 
 // ============================================================================

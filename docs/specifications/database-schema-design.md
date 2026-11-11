@@ -193,7 +193,7 @@ delivery_gap：tenant_id ID、gap_id ID PK、target_id ID、observation_id ID、
 2. binding_revision(b1) active；point_binding 声明地址、raw_type 和转换规则。源 s1 必须获授权。
 3. 引擎校验整个消息，分配稳定 observation_id=o1 并追加 WAL；达到配置同步边界后可返回 accepted_durable。
 4. 历史消费者在单一 DuckDB 事务中执行 applied_message 判重、历史 / 死区基准和应用标记；事务提交后更新对应 checkpoint。
-5. latest_value 写入 245.6，并保留采样时间；若稍后连接断开，更新 point_quality_state 为 bad，不把旧值当作新采样。
+5. latest_value 写入 245.6，并保留采样时间；若稍后收到有明确点位读取超时证据的状态事件，更新该点 point_quality_state 为 bad，不把旧值当作新采样。仅网关连接断开时只更新连接事实，freshness 独立计算，不推定所有点位 bad。
 6. 若 external target 启用，其 delivery_state 是独立结果；本地已提交但外部 pending 时查询必须展示同步差异。
 
 ## 11. 事务、一致性与恢复边界

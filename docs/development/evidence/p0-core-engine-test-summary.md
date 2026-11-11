@@ -1,6 +1,14 @@
 # P0 核心数据引擎（D01–D08）测试结论总结
 
-> 状态：全部通过 | 分支：`feat/p0-core-data-engine` | 日期：2026-11-06
+> **2026-11-11 全量收敛更新（D00.3–D11、存储分层 `SD-STORAGE-01`/`SD-STORAGE-02`、`ST-02`/`ST-04`/凭据脱敏、`D01.2`/`D10.1`、UX01–UX12、P1 能力）：**
+> 2026-11-07 更正说明中列出的全部代码与契约缺口（WAL `payload_len`/`version` 损坏检测、`source_device_grant` `[valid_from_ms, valid_to_ms)` 半开区间校验、`accepted_volatile` 落库状态标记与 `GET /v1/ingestions/{ingest_id}` 双维状态查询、`resource_id` 权威查表防碰撞、历史查询 `watermark_received_at_ms` 游标稳定性、WebSocket `subscription_terminated` vs `resync_required` 线协议区分、SQLite 业务存储 `business_metadata.sqlite`（14 张 OLTP 表）+ 可插拔 `TimeSeriesStorageAdapter`、`ST-02` 能力矩阵握手、`ST-04` 非连续投递空洞水位线对账、外部 TSDB 凭据脱敏 `"***REDACTED***"`、`D01.2` 单实例目录独占锁 `engine.lock` 与 `stream_epoch`、`D10.1` 在线一致性快照备份与隔离沙箱恢复校验，以及完整 HTTP/1.1 REST + RFC 6455 WebSocket 守护进程 `iotfast_server` 与 HMAC-SHA256 Scope 令牌鉴权）均已修复并落地。
+> 当前 `cargo test --locked --manifest-path prototype/Cargo.toml` 共 **30 项测试全部通过**（覆盖 15 个集成测试套件与 `dev_server` 单元测试），`f1_d00_contract` **13 项黄金向量测试通过**，`scripts/verify-machine-contracts.py` **49 条 HTTP/WS 路径（57 个操作、63 个组件 Schema）/ 58 项路由与 `$ref` 检查 / 66 项正反断言全部通过**，`scripts/iotfast_mcp_readonly_adapter.py --self-test` 与一键演示脚本 `python3 scripts/mvp-thing-model-demo.py`（8 步全链路）退出码均为 `0`。物理掉电（F03 硬件级）、二期外部 `taosd`（TDengine）集群实连（`SD-STORAGE-02`/`ST-06`）与真实工业网关现场接入（D09/D10）仍按门禁划分。
+>
+> **2026-11-07 更正（历史背景保留）：以下 §1–§6 为 2026-11-06 的历史记录，原结论过于乐观，不作为最终现场验收结论。** 原型根 crate 当时实际有 8 个集成测试文件、14 个测试（7 个任务测试及 7 个审查回归测试），而非 9 个套件、15 个测试。2026-11-06 合并后及后续目录调整后的 `cargo test` 均显示 14 个通过；这只能证明所执行的断言通过。本文 §1–§6 保留历史原文，2026-11-10 新增测试覆盖见文末 **§7**。
+>
+> **位置变更：** 原根 crate 和可行性项目现位于 `prototype/`。运行原型测试使用 `cargo test --manifest-path prototype/Cargo.toml`；独立向量验证使用 `cd prototype/feasibility/f1_d00_contract && cargo test && python3 verify_vectors.py`。历史文中的旧路径和命令保留以反映当时记录。
+
+> 历史状态（已更正）：全部通过 | 分支：`feat/p0-core-data-engine` | 日期：2026-11-06
 
 ## 1. 测试概况
 
@@ -139,6 +147,45 @@ cargo test --test review_fixes_test
 cd feasibility/f1_d00_contract && cargo test && python3 verify_vectors.py
 ```
 
-## 6. 结论
+## 6. 结论（2026-11-06 历史记录）
 
 P0 核心数据引擎 15 项集成测试全部通过，覆盖从 D00 确定性标识到北向订阅衔接的完整数据链路。3 项 Critical 和 6 项 Important 审查发现均已修复并通过 TDD 验证。3 项 Minor 延期处理，不影响 P0 闭环正确性。引擎可进入下一阶段（HTTP 传输层接入与集成测试）。
+
+---
+
+## 7. 2026-11-10 全量收敛（D00.3–D11、`SD-STORAGE-01`、UX01–UX12、P1）与 HTTP/WS 全链路验证
+
+### 7.1 新增与扩展测试套件及专项证据报告
+
+| 套件 / 脚本 | 用例数 | 核心验证点与对应证据报告 | 结果 |
+|---|---:|---|---|
+| [`tests/mvp_thing_model_server_test.rs`](../../../prototype/tests/mvp_thing_model_server_test.rs) | 1（含 13 步全链路断言） | HMAC Scope 令牌鉴权与伪造头 `422`（`Q02`）、物模型 `r1->r2->r3` 演进与 `:diff`、资产树与跨树拓扑关系（`FEEDS`）、历史 `canonical_uri` 过期后永久防抢占（`Q06`）、设备物模型平滑升级保留 `resource_id`（`Q11`）、`gateway_measurement + static_config` 属性引用与 `manual_stop_window` 激活（`Q09`）、`source_device_grant` 未到 `valid_from_ms` 拒绝 `403`（`Q02`）、耐久与易失入站双维状态查询 `GET /v1/ingestions/{id}`（`Q07`/`Q12`）、WebSocket 快照衔接 `delta` 与凭据过期 `subscription_terminated`（`Q05`）、`watermark_received_at_ms` 并发迟到稳定分页（`Q08`）、`EngineConfig::validate()` 容量水位校验（`Q10`） | ✅ PASS |
+| [`tests/storage_sqlite_duckdb_tdengine_test.rs`](../../../prototype/tests/storage_sqlite_duckdb_tdengine_test.rs) | 4 | `SD-STORAGE-01`/`SD-STORAGE-02` 双存储分层 + `ST-02`/`ST-04`/凭据脱敏 + `D01.2`/`D10.1`：SQLite `business_metadata.sqlite`（14 张 OLTP 表，含 `edge_adapter`、`derived_metric`）独立灾备恢复 + DuckDB `engine.duckdb` 默认时序存储 + 可插拔 `TimeSeriesStorageAdapter`（`tdengine` `STABLE`/Subtable、`/rest/sql/{db}`、`timescaledb`、`clickhouse`）在线切换与查询下推 + `tdengine_config.password = "***REDACTED***"` 脱敏 + `ST-02` 能力矩阵握手（`/v1/storage/capabilities` 与 `strict_lossless: true` 守卫）+ `ST-04` 非连续投递空洞水位线状态机（`/v1/storage/checkpoints` 与 `:reconcile`）+ `D01.2` 单实例目录锁 `engine.lock` 与 `stream_epoch` + `D10.1` 在线一致性快照备份与隔离沙箱恢复校验（`/v1/storage/backups*`） — 见 [存储分层验证报告](storage-sqlite-duckdb-tdengine-report.md) | ✅ PASS |
+| [`tests/d09_gateway_replay_fixture_test.rs`](../../../prototype/tests/d09_gateway_replay_fixture_test.rs) | 1 | 离线工业网关断连（`freshness="stale"` 不篡改 `quality`）、缓存乱序补传（`replayed=true` 写历史不倒退 `latest_value`）与绑定版本切换对账 Fixture — 见 [D09 离线网关回放报告](d09-offline-gateway-fixture-report.md) | ✅ PASS |
+| [`tests/d10_fault_and_capacity_test.rs`](../../../prototype/tests/d10_fault_and_capacity_test.rs) | 2 | 开发态 F01–F05 故障矩阵、`WAL-CORRUPTION` 停机账本对账、软/硬水位背压（`503 DURABILITY_BACKPRESSURE`）与 P50/P95/P99 延迟基线 — 见 [D10 故障与容量基线报告](d10-dev-fault-capacity-report.md) | ✅ PASS |
+| [`tests/d11_northbound_mcp_boundary_test.rs`](../../../prototype/tests/d11_northbound_mcp_boundary_test.rs) & [`scripts/iotfast_mcp_readonly_adapter.py`](../../../scripts/iotfast_mcp_readonly_adapter.py) | 1 + 6 步自检 | 上层只读 MCP 适配器、R09 属性裁剪、越权 404 隐匿、写/控制工具硬拒绝与 AI 注入防护 — 见 [D11 只读 MCP 适配器报告](d11-mcp-readonly-adapter-report.md) | ✅ PASS |
+| [`tests/ux_journey_and_matrix_test.rs`](../../../prototype/tests/ux_journey_and_matrix_test.rs) | 1 | U01–U08 完整集成旅程与 UX01–UX12 异常状态矩阵端到端验证 — 见 [UX01–UX12 集成旅程报告](ux01-ux12-integration-journey-report.md) | ✅ PASS |
+| [`tests/p1_capability_and_derived_metrics_test.rs`](../../../prototype/tests/p1_capability_and_derived_metrics_test.rs) | 3 | P1 可插拔时序存储能力边界、跨版本单位冲突守卫（`NB08`）、边缘适配器注册表与物模型派生指标（OEE / 单位能耗） — 见 [P1 能力与派生指标报告](p1-capability-and-derived-metrics-report.md) | ✅ PASS |
+| [`scripts/verify-machine-contracts.py`](../../../scripts/verify-machine-contracts.py) | 66 项断言 | 4 份 JSON Schema 2020-12、OpenAPI 3.1（49 条路径 / 57 个操作 / 63 个组件 Schema / 58 项路由与 `$ref` 检查）与黄金向量机器契约校验 — 见 [D00.3 机器契约验证报告](d00-3-machine-contract-verification.md) | ✅ PASS (`exit 0`) |
+| [`src/bin/dev_server.rs`](../../../prototype/src/bin/dev_server.rs) (unit tests) | 2 | `source_device_grant` `[valid_from_ms, valid_to_ms)` 半开区间边界、DuckDB 事务提交失败回滚并停止准入 | ✅ PASS |
+| [`scripts/mvp-thing-model-demo.py`](../../../scripts/mvp-thing-model-demo.py) | 8 步端到端 | 编译并启动 `iotfast_server`，通过真实 HTTP/WebSocket 跑通产品 -> 模型版本演进 -> 资产树与拓扑 -> 设备平滑升级 -> 动态/静态数据引用 -> 耐久遥测与 WS 实时推送 -> 业务视图与历史查询 -> SQLite/DuckDB/TDengine 存储状态、凭据脱敏、`ST-02` 能力矩阵、`ST-04` 水位线对账与 `D10.1` 在线一致性快照备份沙箱恢复校验 | ✅ PASS (`exit 0`) |
+
+### 7.2 最新可复现执行命令
+
+```bash
+# 1. 全量单元与集成测试（30 passed, 0 failed）
+cargo test --locked --manifest-path prototype/Cargo.toml
+
+# 2. D00 契约黄金向量测试（13 passed）与 Python 跨语言验证
+cargo test --locked --manifest-path prototype/feasibility/f1_d00_contract/Cargo.toml
+python3 prototype/feasibility/f1_d00_contract/verify_vectors.py
+
+# 3. D00.3 机器契约校验（49 条路径 / 57 个操作 / 63 个组件 Schema / 58 项路由与 $ref 检查 / 66 项正反断言）
+python3 scripts/verify-machine-contracts.py
+
+# 4. D11 上层只读 MCP 适配器自检
+python3 scripts/iotfast_mcp_readonly_adapter.py --self-test
+
+# 5. 端到端物模型、UNS 数据管理与存储适配器切换 MVP 演示脚本（8 步）
+python3 scripts/mvp-thing-model-demo.py
+```

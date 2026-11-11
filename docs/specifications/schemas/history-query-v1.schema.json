@@ -1,0 +1,492 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iotfast.io/schemas/history-query-v1.schema.json",
+  "title": "IoTFast Northbound History Query v1 (HistoryQueryRequest & HistoryQueryResponse)",
+  "description": "Machine contract for POST /v1/history/query aligned with D00.2 decisions Q03 and Q08. Enforces all 8 required top-level request fields, bare JSON values, and coverage/gap disclosure.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "resource_ids",
+    "range",
+    "mode",
+    "aggregation",
+    "quality_states",
+    "order",
+    "limit",
+    "cursor"
+  ],
+  "properties": {
+    "resource_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 64
+      },
+      "description": "Non-empty list of authorized stable resource_ids to query."
+    },
+    "range": {
+      "$ref": "#/$defs/TimeRange"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "raw",
+        "aggregate"
+      ]
+    },
+    "aggregation": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/AggregationSpec"
+        }
+      ]
+    },
+    "quality_states": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "good",
+          "uncertain",
+          "bad",
+          "unknown"
+        ]
+      }
+    },
+    "order": {
+      "type": "string",
+      "enum": [
+        "asc",
+        "desc"
+      ]
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000
+    },
+    "cursor": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Server HMAC-SHA256 signed pagination cursor binding tenant_id, scope_hash, query_fingerprint, and watermark_received_at_ms (Q08)."
+    }
+  },
+  "$defs": {
+    "TimeRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_ms",
+        "end_ms"
+      ],
+      "properties": {
+        "start_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Inclusive UTC start timestamp in milliseconds [start_ms, end_ms)."
+        },
+        "end_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Exclusive UTC end timestamp in milliseconds [start_ms, end_ms)."
+        }
+      }
+    },
+    "AggregationSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bucket_ms",
+        "functions"
+      ],
+      "properties": {
+        "bucket_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "functions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "avg",
+              "min",
+              "max",
+              "count",
+              "first",
+              "last"
+            ]
+          }
+        },
+        "empty_bucket_policy": {
+          "type": "string",
+          "enum": [
+            "omit",
+            "null"
+          ]
+        }
+      }
+    },
+    "UnitSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "symbol"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "symbol": {
+          "type": "string",
+          "maxLength": 64
+        }
+      }
+    },
+    "DeliveryGapInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gap_id",
+        "resource_id",
+        "start_ms",
+        "end_ms",
+        "reason"
+      ],
+      "properties": {
+        "gap_id": {
+          "type": "string"
+        },
+        "resource_id": {
+          "type": "string"
+        },
+        "start_ms": {
+          "type": "integer"
+        },
+        "end_ms": {
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "HistoryCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contiguous_wal_position",
+        "event_time_complete_through_ms",
+        "event_time_completeness"
+      ],
+      "properties": {
+        "contiguous_wal_position": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{16}:[0-9a-f]{16}$"
+        },
+        "event_time_complete_through_ms": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "event_time_completeness": {
+          "type": "string",
+          "enum": [
+            "unknown",
+            "partial",
+            "complete"
+          ]
+        },
+        "known_gaps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DeliveryGapInfo"
+          }
+        }
+      }
+    },
+    "HistoryObservationItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "resource_id",
+        "device_id",
+        "property",
+        "model_revision_id",
+        "binding_revision_id",
+        "source_at_ms",
+        "received_at_ms",
+        "source_time_origin",
+        "value_type",
+        "value",
+        "quality",
+        "replayed"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "pattern": "^obs-[a-z2-7]{26}$"
+        },
+        "resource_id": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 64
+        },
+        "device_id": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 64
+        },
+        "property": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "model_revision_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "binding_revision_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "source_at_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "received_at_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_time_origin": {
+          "type": "string",
+          "enum": [
+            "device_clock",
+            "protocol_timestamp",
+            "gateway_sample",
+            "external_source"
+          ]
+        },
+        "source_seq": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$"
+        },
+        "value_type": {
+          "type": "string",
+          "enum": [
+            "float64",
+            "int64",
+            "bool",
+            "text"
+          ]
+        },
+        "value": {
+          "type": [
+            "number",
+            "integer",
+            "boolean",
+            "string"
+          ]
+        },
+        "unit": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/UnitSpec"
+            }
+          ]
+        },
+        "unit_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unit_symbol": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "quality": {
+          "type": "string",
+          "enum": [
+            "good",
+            "uncertain",
+            "bad",
+            "unknown"
+          ]
+        },
+        "source_quality_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "replayed": {
+          "type": "boolean"
+        },
+        "record_kind": {
+          "type": "string",
+          "enum": [
+            "measured"
+          ]
+        }
+      }
+    },
+    "AggregationBucket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bucket_start_ms",
+        "bucket_end_ms",
+        "count"
+      ],
+      "properties": {
+        "resource_id": {
+          "type": "string"
+        },
+        "bucket_start_ms": {
+          "type": "integer"
+        },
+        "bucket_end_ms": {
+          "type": "integer"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "avg": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "max": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "first": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "last": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "HistoryQueryResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_id",
+        "mode",
+        "consistency",
+        "partial",
+        "coverage",
+        "items",
+        "next_cursor"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string"
+        },
+        "target_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_mode": {
+          "type": "string",
+          "enum": [
+            "managed_ingest",
+            "referenced_read"
+          ]
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "raw",
+            "aggregate"
+          ]
+        },
+        "consistency": {
+          "type": "string",
+          "enum": [
+            "strong_snapshot",
+            "eventual"
+          ]
+        },
+        "partial": {
+          "type": "boolean"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "coverage": {
+          "$ref": "#/$defs/HistoryCoverage"
+        },
+        "known_gaps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DeliveryGapInfo"
+          }
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/HistoryObservationItem"
+          }
+        },
+        "buckets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AggregationBucket"
+          }
+        },
+        "next_cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

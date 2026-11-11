@@ -61,9 +61,10 @@
 ### 2.2 范围求值规则
 
 1. **租户硬隔离**：首先匹配 `resource.tenant_id == context.tenant_id`；跨租户访问在任何接口下均不可见。
-2. **动作白名单**：当前 API 所需动作必须包含在 `allowed_actions` 中，否则返回 `403 FORBIDDEN_ACTION`。
-3. **资源交集/并集判定**：
-   - 对 `southbound_source`：仅允许操作 `context.source_id == payload.source_id` 且在当前有效 `source_device_grant` 内的 `device_id`。
+2. **时效与不可伪造构造（Q02 冻结）**：`VerifiedScopeContext` 严禁从客户端请求头、请求体或查询参数直接反序列化生成，只能由服务端认证边界在完成凭证验签并确认 `issued_at_ms <= now_ms < expires_at_ms` 后构造；每个入口（含历史查询、分页、目录、入站及状态上报）均须在执行动作与读取缓存/存储前按当前可信服务端时间校验有效期。
+3. **动作白名单**：当前 API 所需动作必须包含在 `allowed_actions` 中，否则返回 `403 FORBIDDEN_ACTION`。
+4. **资源交集/并集判定**：
+   - 对 `southbound_source`：调用方主体通过 `source_gateway.auth_identity_ref`（或显式注册映射）解析可操作的 `source_id`，再校验 `(tenant_id, source_id, device_id)` 在 `source_device_grant` 中处于有效状态且满足半开时间区间 `valid_from_ms <= now_ms < valid_to_ms`（若 `valid_to_ms` 非空）；未到 `valid_from_ms` 或已达 `valid_to_ms` 一律返回 `403 SOURCE_NOT_AUTHORIZED`。
    - 对北向与管理类调用：`scope_filter` 中非空维度（`asset_ids`、`device_ids`、`resource_ids`、`uri_prefixes`）按明确的并集语义组成可访问资源集合，再与租户和动作范围求交；若所有范围维度均为空且未显式声明租户级全量标志 `tenant_wide: true`，按 **空范围（拒绝一切资源）** 处理。
    - `uri_prefixes` 仅按规范化后的路径段边界匹配（例如 `uns://8iic/plant-a/` 匹配 `uns://8iic/plant-a/pump-001`，绝不匹配 `uns://8iic/plant-ab/pump-001`）。
 
@@ -89,7 +90,7 @@
 
 | 标识 | 格式约束 | 生成与稳定性规则 |
 |---|---|---|
-| `tenant_id` / `device_id` / `resource_id` / `source_id` | ASCII `[a-z0-9][a-z0-9_-]{1,62}[a-z0-9]`，长度 3–64，区分大小写（统一小写） | 服务端创建时分配，生命周期内不可变，停用后不复用 |
+| `tenant_id` / `device_id` / `resource_id` / `source_id` | ASCII `[a-z0-9][a-z0-9_-]{1,62}[a-z0-9]`，长度 3–64，区分大小写（统一小写） | 服务端创建时分配，生命周期内不可变，停用后不复用。其中 `resource_id` 由设备实例化事务写入 `resource` 表作为唯一权威映射（可读形式 `res-{device_id}-{identifier_kebab}` 无同表冲突时采用，发生冲突时回退确定性派生 `"res-" + Base32LowerNoPad(SHA-256("iotfast.res.v1\0" + tenant_id + "\0" + device_id + "\0" + kind + "\0" + identifier)[0..16])`）；**严禁入站或查询层跳过 `resource` 表靠字符串拼接反推 `resource_id`**（Q11） |
 | `message_id` | 可打印 ASCII（`0x21..0x7E`），长度 1–128 | 网关/来源生成；同一重试周期内固定 |
 | `source_epoch` | ASCII `[A-Za-z0-9_.:-]{1,64}` | 来源序列纪元；同次重试不变，重启若无法恢复序列则必须更换新 epoch |
 | `message_key` | 四元组 `(tenant_id, source_id, source_epoch, message_id)` | 入站鉴权后确定，作为幂等去重唯一键 |
@@ -252,6 +253,6 @@
 - **SC05（同 key 篡改点位值冲突）**：相同 `(tenant_id, source_id, source_epoch, message_id)` 将温度从 `245.6` 改为 `245.7`，摘要变化，返回 `409 IDEMPOTENCY_CONFLICT`。
 - **SC06（`source_seq` 数值序比较）**：同一毫秒内收到 `source_seq="999"`（值 24.0）与 `source_seq="1000"`（值 25.0），`latest_value` 正确保留 `"1000"` 对应的 25.0。
 - **SC07（未来时钟漂移拦截）**：网关上报 `source_at_ms` 超出服务端当前时间 2 小时，消息被拒绝或隔离，不污染 `latest_value`。
-- **SC08（状态事件不伪造测量）**：上报 `iotfast.source_state.v1` 超时事件后，设备视图中 `quality="bad"`，但 `last_known_value` 及其 `value_sampled_at_ms` 保持原值，历史测量表不新增记录。
+- **SC08（状态事件不伪造测量）**：上报带明确点位读取超时证据的 `iotfast.source_state.v1` 事件后，该点当前 `quality="bad"`，但 `last_known_value` 及其 `value_sampled_at_ms` 保持原值，历史测量表不新增记录。另测仅网关断连：只更新连接事实，不推定全部点位 bad；freshness 独立计算。
 - **SC09（测量消息禁止 `null` 值）**：向 `POST /v1/telemetry` 发送 `value: null` 的点位，整消息返回 `422 VALIDATION_FAILED`。
 - **SC10（长连接凭证过期断连）**：WebSocket 订阅会话超过 `expires_at_ms` 未续期，服务端发送 `subscription_terminated` 并停止推送后续增量。

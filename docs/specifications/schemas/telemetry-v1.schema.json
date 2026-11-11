@@ -1,0 +1,313 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iotfast.io/schemas/telemetry-v1.schema.json",
+  "title": "IoTFast Southbound Telemetry Envelope v1 (iotfast.telemetry.v1)",
+  "description": "Machine contract for POST /v1/telemetry aligned with D00.2 decisions Q03 and Q12. Enforces bare JSON scalar values, forbids unknown fields, and restricts southbound source_time_origin.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "spec",
+    "message_id",
+    "source_id",
+    "source_epoch",
+    "device_id",
+    "model_revision_id",
+    "binding_revision_id",
+    "points"
+  ],
+  "properties": {
+    "spec": {
+      "type": "string",
+      "const": "iotfast.telemetry.v1",
+      "description": "Fixed wire specification identifier for southbound telemetry v1."
+    },
+    "message_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[!-~]{1,128}$",
+      "description": "Source-generated printable ASCII message identifier (0x21..0x7E), invariant across retries."
+    },
+    "source_id": {
+      "$ref": "#/$defs/EntityId",
+      "description": "Authenticated southbound source gateway identifier."
+    },
+    "source_epoch": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9_.:-]{1,64}$",
+      "description": "Monotonic sequence epoch of the southbound source."
+    },
+    "device_id": {
+      "$ref": "#/$defs/EntityId",
+      "description": "Target device identifier authorized by source_device_grant."
+    },
+    "model_revision_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[!-~]{1,128}$",
+      "description": "Published immutable thing model revision identifier."
+    },
+    "binding_revision_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[!-~]{1,128}$",
+      "description": "Active or window-proven binding revision snapshot identifier."
+    },
+    "points": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1024,
+      "items": {
+        "$ref": "#/$defs/TelemetryPoint"
+      },
+      "description": "Non-empty atomic batch of engineering point measurements for a single device."
+    }
+  },
+  "$defs": {
+    "EntityId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9][a-z0-9_-]{1,62}[a-z0-9]$"
+    },
+    "BareScalarValue": {
+      "description": "Bare JSON engineering scalar (float64, int64, bool, or text). Null, arrays, and enum-wrapped objects (e.g. TypedPointValue) are strictly forbidden (Q03, SC09).",
+      "type": [
+        "number",
+        "integer",
+        "boolean",
+        "string"
+      ]
+    },
+    "SouthboundTimeOrigin": {
+      "type": "string",
+      "enum": [
+        "device_clock",
+        "protocol_timestamp",
+        "gateway_sample"
+      ],
+      "description": "Southbound telemetry time origin vocabulary (Q03). external_source is forbidden on southbound telemetry."
+    },
+    "SourceSeq": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20,
+      "pattern": "^(0|[1-9][0-9]{0,19})$",
+      "description": "Unsigned 64-bit decimal integer string without leading zeros (0..=18446744073709551615)."
+    },
+    "TelemetryQuality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "good",
+            "uncertain",
+            "bad",
+            "unknown"
+          ]
+        },
+        "source_protocol": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "source_code": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        }
+      }
+    },
+    "TelemetryDelivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "replayed"
+      ],
+      "properties": {
+        "replayed": {
+          "type": "boolean",
+          "description": "Indicates store-and-forward replay; excluded from sha256-jcs-v1 payload_hash."
+        }
+      }
+    },
+    "TelemetryPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "property",
+        "value",
+        "source_at_ms",
+        "source_time_origin",
+        "source_seq",
+        "quality",
+        "delivery"
+      ],
+      "properties": {
+        "property": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_.-]{1,128}$"
+        },
+        "value": {
+          "$ref": "#/$defs/BareScalarValue"
+        },
+        "source_at_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Sampling timestamp in UTC Unix milliseconds."
+        },
+        "source_time_origin": {
+          "$ref": "#/$defs/SouthboundTimeOrigin"
+        },
+        "source_seq": {
+          "$ref": "#/$defs/SourceSeq"
+        },
+        "quality": {
+          "$ref": "#/$defs/TelemetryQuality"
+        },
+        "delivery": {
+          "$ref": "#/$defs/TelemetryDelivery"
+        }
+      }
+    },
+    "IngestReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ingest_id",
+        "message_id",
+        "status",
+        "history_status",
+        "payload_hash",
+        "observation_ids"
+      ],
+      "properties": {
+        "http_status": {
+          "type": "integer",
+          "enum": [
+            200,
+            202
+          ]
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "ingest_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "accepted_durable",
+            "accepted_volatile",
+            "duplicate"
+          ],
+          "description": "Ingestion boundary acceptance status (Q12)."
+        },
+        "history_status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "committed",
+            "failed"
+          ],
+          "description": "Asynchronous or transactional historian projection status (Q12)."
+        },
+        "payload_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "wal_position": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{16}:[0-9a-f]{16}$"
+        },
+        "observation_ids": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^obs-[a-z2-7]{26}$"
+          }
+        }
+      }
+    },
+    "IngestStatusRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ingest_id",
+        "message_id",
+        "status",
+        "history_status",
+        "updated_at_ms"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string"
+        },
+        "ingest_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tenant_id": {
+          "$ref": "#/$defs/EntityId"
+        },
+        "message_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "accepted_durable",
+            "accepted_volatile",
+            "duplicate"
+          ]
+        },
+        "history_status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "committed",
+            "failed"
+          ]
+        },
+        "wal_position": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{16}:[0-9a-f]{16}$"
+        },
+        "updated_at_ms": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

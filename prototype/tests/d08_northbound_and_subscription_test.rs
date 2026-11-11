@@ -288,7 +288,10 @@ fn d08_verifies_view_shadow_scope_r09_history_r07_nb07_to_nb10_and_subscription_
     // and unbound property (maintenance_note) is unbound + null + unknown.
     let v0 = rt.get_device_view(&nb_ctx, "pump-001", 20_000).unwrap();
     assert_eq!(v0.properties["outlet_pressure"].binding_state, "bound");
-    assert_eq!(v0.properties["outlet_pressure"].observation_state, "no_observation");
+    assert_eq!(
+        v0.properties["outlet_pressure"].observation_state,
+        "no_observation"
+    );
     assert_eq!(v0.properties["outlet_pressure"].value, json!(null));
     assert_eq!(v0.properties["outlet_pressure"].quality, "unknown");
     assert_eq!(v0.properties["maintenance_note"].binding_state, "unbound");
@@ -348,16 +351,25 @@ fn d08_verifies_view_shadow_scope_r09_history_r07_nb07_to_nb10_and_subscription_
         caller_kind: CallerKind::NorthboundService,
         issued_at_ms: 1_000,
         expires_at_ms: 90_000_000,
-        allowed_actions: vec!["view:read".into(), "shadow:read".into(), "history:query".into()],
+        allowed_actions: vec![
+            "view:read".into(),
+            "shadow:read".into(),
+            "history:query".into(),
+        ],
         scope_filter: ScopeFilter {
             resource_ids: vec!["res-pump-001-outlet-pressure".into()],
             ..Default::default()
         },
         operator_id: None,
     };
-    let partial_view = rt.get_device_view(&partial_ctx, "pump-001", 103_000).unwrap();
+    let partial_view = rt
+        .get_device_view(&partial_ctx, "pump-001", 103_000)
+        .unwrap();
     assert_eq!(partial_view.properties.len(), 1);
-    assert_eq!(partial_view.properties["outlet_pressure"].value, json!(0.44));
+    assert_eq!(
+        partial_view.properties["outlet_pressure"].value,
+        json!(0.44)
+    );
 
     // R05: Batch history query mixing authorized + unauthorized resource_ids returns 404 with empty details
     let batch_err = rt

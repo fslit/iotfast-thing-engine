@@ -43,8 +43,8 @@
 ### 3.2 资产迁移与 UNS 路径重命名 (`POST /v1/devices/{device_id}:relocate` / `PATCH /v1/assets/{asset_id}`)
 
 - 移动设备所属资产或修改资产 `slug` 时，**`asset_id`、`device_id`、`resource_id` 绝对不变**。
-- 原 `resource_path` 记录在同一事务内设置 `valid_to_ms = now`、`redirect_until_ms = now + redirect_retention_ms`、`path_state = "redirecting"`，同时插入新的 `active` 路径行。
-- 在 `redirect_until_ms` 到期前，任何新资产或新设备不得占用该历史 `canonical_uri`；同父节点下 `slug` 冲突或形成父子环路时返回 `409 REVISION_CONFLICT` / `422 VALIDATION_FAILED`。
+- 原 `resource_path` 记录在同一事务内设置 `valid_to_ms = now`、`redirect_until_ms = now + redirect_retention_ms`、`path_state = "redirecting"`（解析返回 `matched_path_state = "redirected"`），同时插入新的 `active` 路径行。
+- **历史路径保留期与防跨资源串用规则（Q06 冻结）**：在 `redirect_until_ms` 到期前，按原 URI 解析返回 `200`（`matched_path_state = "redirected"`）并指向新 `canonical_uri`；超过 `redirect_until_ms` 后，该历史路径状态视为 `retired`，按原 URI 解析返回 `404 RESOURCE_NOT_FOUND`。P0 阶段**永久禁止其他不同的 `resource_id` 占用任何曾被分配过的历史 `canonical_uri`**（返回 `409 REVISION_CONFLICT`），仅允许原 `resource_id` 自身迁回原位置时重新激活该路径；同父节点下 `slug` 冲突或形成父子环路时返回 `409 REVISION_CONFLICT` / `422 VALIDATION_FAILED`。
 
 ## 4. 控制面：来源绑定与激活状态机（D04）
 
@@ -237,6 +237,20 @@
 
 收到 `resync_required` 后，本轮订阅立即终止，客户端必须重新发起订阅拉取快照；严禁服务端静默丢弃增量帧后继续伪装连续流。
 
+**（5）凭证过期或范围撤销时的 `subscription_terminated`（SC10 / Q05 冻结）**：
+
+```json
+{
+  "type": "subscription_terminated",
+  "subscription_id": "sub-srv-9001",
+  "stream_epoch": "srv-epoch-20261105-01",
+  "reason": "CREDENTIAL_EXPIRED",
+  "message": "Subscription session credential has expired or scope was revoked; re-authenticate before opening a new subscription."
+}
+```
+
+区分约定：`resync_required` 仅用于授权仍有效但缓冲溢出或快照边界无法维持的场景；当凭证到达 `expires_at_ms` 或权限被撤销时，必须发送 `subscription_terminated`（`reason` 为 `"CREDENTIAL_EXPIRED"` 或 `"SCOPE_REVOKED"`）并立即终止推送，不得混用 `resync_required`。
+
 ## 7. 北向数据面：受限历史查询契约（`POST /v1/history/query`）
 
 ### 7.1 请求结构
@@ -307,7 +321,7 @@
 
 WAL 连续位置只表示日志处理进度，不能证明事件时间上再无迟到数据；只有来源与迟到策略能够提供可验证的完整性时才返回 `event_time_complete_through_ms`，否则为 `null` / `unknown`。
 
-分页游标（`next_cursor`）经过服务端签名，内部绑定 `(tenant_id, scope_hash, query_fingerprint, snapshot_boundary, last_source_at_ms, last_observation_id)`；篡改游标或切换调用范围后重放游标返回 `422 VALIDATION_FAILED`。当存在 `delivery_gap` 或外部库部分不可达时，`partial` 设为 `true` 并在 `coverage.known_gaps` 中列出受影响时间区间与原因。
+分页游标（`next_cursor`）经过服务端 HMAC-SHA256 签名（Q08 冻结），内部绑定 `(tenant_id, scope_hash, query_fingerprint, watermark_received_at_ms, last_source_at_ms, last_observation_id, expires_at_ms)`；其中 `watermark_received_at_ms` 为首次查询在本地存储捕获的接收水位，后续分页查询仅扫描 `received_at_ms <= watermark_received_at_ms` 的已提交记录，确保翻页过程中新入站数据不改变已确定的分页序列。篡改游标、游标过期或切换调用范围后重放游标一律返回 `422 VALIDATION_FAILED`。当存在 `delivery_gap` 或外部库部分不可达时，`partial` 设为 `true` 并在 `coverage.known_gaps` 中列出受影响时间区间与原因。
 
 ## 8. 面向只读目录与上层 MCP 的边界约定（D11）
 
@@ -321,7 +335,7 @@ WAL 连续位置只表示日志处理进度，不能证明事件时间上再无�
 - **NB01（已发布模型不可变）**：对 `state=published` 的 `model_revision_id` 发起修改或重复覆盖发布，返回 `409 REVISION_CONFLICT`。
 - **NB02（资产迁址 ID 稳定与历史重定向）**：设备从车间 A 移至车间 B 后，`device_id` 与各属性 `resource_id` 不变；查询原 `canonical_uri` 返回 `matched_path_state="redirected"` 及新 URI，且保留期内其他设备无法注册原 URI。
 - **NB03（未上报与未绑定零伪造）**：新建设备尚未上报数据时，`GET /v1/devices/{id}/view` 返回 `value: null, quality: "unknown", observation_state: "no_observation"`，不出现默认 `0` 或 `false`。
-- **NB04（故障时间与测量时间分离）**：上报 `0.42 MPa` 后发生网关超时，`/view` 与 `/shadow` 中 `value` 仍为 `0.42`、`value_sampled_at_ms` 不变，而 `quality="bad"`、`quality_observed_at_ms` 更新为超时时间。
+- **NB04（故障时间与测量时间分离）**：上报 `0.42 MPa` 后，网关提供该点位读取超时证据，`/view` 与 `/shadow` 中 `value` 仍为 `0.42`、`value_sampled_at_ms` 不变，而当前 `quality="bad"`、`quality_observed_at_ms` 更新为超时时间。另测仅网关失联且无点位错误证据：不推定所有点位 bad，连接事实与 freshness 独立呈现。
 - **NB05（订阅边界 `S` 无缝衔接）**：在持续高频写入期间建立 WebSocket 订阅，合并快照与 `stream_seq > S` 的 `delta` 后，客户端最终状态与服务端最新 `resource_revision` 完全一致，无漏点。
 - **NB06（慢消费溢出强制 `resync_required`）**：人为阻塞订阅客户端读取使服务端增量缓冲满，服务端返回 `resync_required` 并断开该订阅，不静默跳帧。
 - **NB07（历史半开区间与同毫秒稳定分页）**：`[1000, 2000)` 包含 `source_at_ms=1000` 的记录、不包含 `2000`；同一毫秒内两条不同 `observation_id` 的记录跨页翻页时不重不漏。

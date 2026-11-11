@@ -199,7 +199,10 @@ fn d07_executes_single_tx_ingest_deadband_out_of_order_r03_r08_and_wal_recovery(
     assert_eq!(r1.http_status, 202);
     assert_eq!(r1.status, "accepted_durable");
     assert_eq!(rt.history_count().unwrap(), 1);
-    assert_eq!(rt.latest_f64("res-dev-oven-02-zone1-temp").unwrap(), Some(245.6));
+    assert_eq!(
+        rt.latest_f64("res-dev-oven-02-zone1-temp").unwrap(),
+        Some(245.6)
+    );
 
     // 2. T03 / SC04: Retry m-001 with replayed=true -> 200 duplicate, same ingest_id, history count stays 1
     let mut m1_retry = m1.clone();
@@ -230,7 +233,10 @@ fn d07_executes_single_tx_ingest_deadband_out_of_order_r03_r08_and_wal_recovery(
     m2.points[0].source_seq = "1000".into();
     rt.ingest_telemetry(&gw_ctx, m2, DurabilityPreference::Durable, 100_200)
         .unwrap();
-    assert_eq!(rt.latest_f64("res-dev-oven-02-zone1-temp").unwrap(), Some(245.8));
+    assert_eq!(
+        rt.latest_f64("res-dev-oven-02-zone1-temp").unwrap(),
+        Some(245.8)
+    );
     assert_eq!(rt.history_count().unwrap(), 1);
 
     // 5. T05: Out-of-order older measurement (source_at_ms = 90_000, value = 240.0, change = 5.6 >= 0.5)
@@ -244,7 +250,10 @@ fn d07_executes_single_tx_ingest_deadband_out_of_order_r03_r08_and_wal_recovery(
     rt.ingest_telemetry(&gw_ctx, m3_ooo, DurabilityPreference::Durable, 100_300)
         .unwrap();
     assert_eq!(rt.history_count().unwrap(), 2);
-    assert_eq!(rt.latest_f64("res-dev-oven-02-zone1-temp").unwrap(), Some(245.8));
+    assert_eq!(
+        rt.latest_f64("res-dev-oven-02-zone1-temp").unwrap(),
+        Some(245.8)
+    );
 
     // 6. T06 / SC08 / R03: report_source_state with point error sets quality="bad" without altering latest value
     let evt = SourceStateEnvelope {
@@ -264,11 +273,16 @@ fn d07_executes_single_tx_ingest_deadband_out_of_order_r03_r08_and_wal_recovery(
             source_code: Some("ETIMEDOUT".into()),
         }],
     };
-    let s_rec = rt.report_source_state(&gw_ctx, evt.clone(), 105_010).unwrap();
+    let s_rec = rt
+        .report_source_state(&gw_ctx, evt.clone(), 105_010)
+        .unwrap();
     assert_eq!(s_rec.status, "accepted");
     let s_dup = rt.report_source_state(&gw_ctx, evt, 105_020).unwrap();
     assert_eq!(s_dup.status, "duplicate");
-    assert_eq!(rt.latest_f64("res-dev-oven-02-zone1-temp").unwrap(), Some(245.8));
+    assert_eq!(
+        rt.latest_f64("res-dev-oven-02-zone1-temp").unwrap(),
+        Some(245.8)
+    );
     assert_eq!(rt.history_count().unwrap(), 2);
 
     // 7. F03 / F04 WAL crash recovery: Append a new valid record directly to AppWal (simulating crash after WAL fsync
@@ -285,7 +299,10 @@ fn d07_executes_single_tx_ingest_deadband_out_of_order_r03_r08_and_wal_recovery(
     let summary = rt.recover_from_wal().unwrap();
     assert_eq!(summary.replayed_messages, 1);
     assert_eq!(rt.history_count().unwrap(), 3);
-    assert_eq!(rt.latest_f64("res-dev-oven-02-zone1-temp").unwrap(), Some(250.0));
+    assert_eq!(
+        rt.latest_f64("res-dev-oven-02-zone1-temp").unwrap(),
+        Some(250.0)
+    );
 
     // Re-running recover_from_wal() after checkpoint advance replays 0 messages and produces 0 duplicates
     let summary2 = rt.recover_from_wal().unwrap();

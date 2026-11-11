@@ -1,0 +1,312 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iotfast.io/schemas/device-view-v1.schema.json",
+  "title": "IoTFast Northbound Device Business View v1 (DeviceBusinessView)",
+  "description": "Machine contract for GET /v1/devices/{device_id}/view and GET /v1/devices/{device_id}/shadow aligned with D00.2 decisions C02, Q03, Q04, and Q11.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "device_id",
+    "device_key",
+    "device_name",
+    "product_id",
+    "model_revision_id",
+    "asset_id",
+    "canonical_device_uri",
+    "active_binding_revision_id",
+    "source_connection_state",
+    "view_generated_at_ms",
+    "view_consistency",
+    "properties"
+  ],
+  "properties": {
+    "request_id": {
+      "type": "string"
+    },
+    "device_id": {
+      "$ref": "#/$defs/EntityId"
+    },
+    "device_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "device_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "product_id": {
+      "$ref": "#/$defs/EntityId"
+    },
+    "product_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "model_revision_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "model_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "asset_id": {
+      "$ref": "#/$defs/EntityId"
+    },
+    "canonical_device_uri": {
+      "type": "string",
+      "pattern": "^uns://[a-z0-9_.-]+(/[a-z0-9_.-]+)+$"
+    },
+    "active_binding_revision_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source_connection_state": {
+      "type": "string",
+      "enum": [
+        "connected",
+        "degraded",
+        "disconnected",
+        "unknown"
+      ]
+    },
+    "view_generated_at_ms": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "view_consistency": {
+      "type": "string",
+      "const": "per_resource_latest"
+    },
+    "properties": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/DevicePropertyView"
+      },
+      "description": "Map of authorized property identifier to its projected business state (R09)."
+    }
+  },
+  "$defs": {
+    "EntityId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9][a-z0-9_-]{1,62}[a-z0-9]$"
+    },
+    "UnitSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "symbol"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "symbol": {
+          "type": "string",
+          "maxLength": 64
+        }
+      }
+    },
+    "DevicePropertyView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resource_id",
+        "name",
+        "data_type",
+        "binding_state",
+        "observation_state",
+        "value",
+        "quality",
+        "quality_reason",
+        "freshness",
+        "value_sampled_at_ms",
+        "quality_observed_at_ms",
+        "received_at_ms",
+        "source_time_origin",
+        "binding_revision_id"
+      ],
+      "properties": {
+        "resource_id": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 64
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "data_type": {
+          "type": "string",
+          "enum": [
+            "float64",
+            "int64",
+            "bool",
+            "text"
+          ]
+        },
+        "unit": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/UnitSpec"
+            }
+          ]
+        },
+        "unit_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unit_symbol": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "binding_state": {
+          "type": "string",
+          "enum": [
+            "bound",
+            "bound_static",
+            "unbound"
+          ],
+          "description": "Property binding state: gateway-bound, static-bound, or unbound."
+        },
+        "observation_state": {
+          "type": "string",
+          "enum": [
+            "observed",
+            "static_configured",
+            "no_observation"
+          ],
+          "description": "Whether a valid measurement has been observed, statically configured, or never observed (NB03)."
+        },
+        "value": {
+          "type": [
+            "number",
+            "integer",
+            "boolean",
+            "string",
+            "null"
+          ],
+          "description": "Bare JSON engineering scalar, or null when observation_state is no_observation (NB03)."
+        },
+        "quality": {
+          "type": "string",
+          "enum": [
+            "good",
+            "uncertain",
+            "bad",
+            "unknown"
+          ]
+        },
+        "quality_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "freshness": {
+          "type": "string",
+          "enum": [
+            "fresh",
+            "stale",
+            "static",
+            "unknown"
+          ]
+        },
+        "value_sampled_at_ms": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "quality_observed_at_ms": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "received_at_ms": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source_time_origin": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "device_clock",
+            "protocol_timestamp",
+            "gateway_sample",
+            "external_source",
+            null
+          ]
+        },
+        "binding_revision_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "resource_revision": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "DeviceShadowView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "device_id",
+        "revision",
+        "source_connection_state",
+        "properties"
+      ],
+      "properties": {
+        "device_id": {
+          "$ref": "#/$defs/EntityId"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_connection_state": {
+          "type": "string",
+          "enum": [
+            "connected",
+            "degraded",
+            "disconnected",
+            "unknown"
+          ]
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/DevicePropertyView"
+          }
+        }
+      }
+    }
+  }
+}

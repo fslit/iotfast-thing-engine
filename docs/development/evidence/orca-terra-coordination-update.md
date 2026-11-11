@@ -1,0 +1,22 @@
+# Terra 协调更新发送回执
+
+- 发送时间：2026-11-10 02:24:31 +0800（回执记录时间）。
+- 目标：`run:run_02b4df14640f`。
+- 主题：用户最新要求：新增 Terra 并行审查任务。
+- 发送结果：命令退出码 `0`，返回 `{"ok":true,"result":{"messageId":"msg_f54d81f68720"}}`。
+- 发送内容：要求协调者启动 S1 安全只读审查、S2 端到端测试设计和 S3 构建依赖核验，限定各自唯一报告文件，使用 `codex` 和 `gpt-6.1-terra`；保留 M0–M3 依赖和单写 owner，不中断运行中的 M0，不修改全局模型设置；核实 Superagent 入口并更新协调状态。
+- 边界：本次仅发送消息，回执不证明协调者已执行；未启动 worker、接管 Run 或修改业务代码。
+- 协调者回复（`msg_baedd817881f` 转述）：已在自身 Run `run_02b4df14640f` 创建并启动 Terra S1 `task_88550cb44b7d/ctx_6193737036b7`、S2 `task_3522f6b151bc/ctx_c49dbbc3a5f9`、S3 `task_079ea15f53bf/ctx_aad322e9d75a`，全部 `--worktree current` 且 receipt 确认 `gpt-6.1-terra`；原 M0 未中断，旧默认型号未被 receipt 暴露故标未知；M1–M3 后续全显式 Terra；status 已记录模型、依赖、scope、IDs；已通知 M0 支线报告供参考，不增无限门禁；`orca --help` 仅核实到正式 orchestration 入口，无 Superagent 独立命令，不猜造，GUI 未核实；等待事件而非轮询。
+- 后续 worker 回执（`inbox --terminal run:run_02b4df14640f --full` 核对，仅转述不复验）：
+- - S1 `task_88550cb44b7d`：审查报告已生成但按停止条件标记失败，发现历史查询缺有效期校验、来源授权忽略生效起点等阻断风险；HTTP 安全测试及 cargo 均未执行。
+- - S1 独立复验 `task_6092cc544634`：复验记录已追加并保留首轮失败，检索与格式检查退出码为 0；产品安全仍未通过，待 M1 修复和 M2 HTTP 实测。
+- - S2 `task_3522f6b151bc`：设计已交付但验证失败，一次校验命令语法错误退出 1，另一次 no-index diff 因文件差异退出 1；待 M0 对齐契约、M2 真实 smoke。
+- - S2 独立复验 `task_45ba3d310396`：复验证据已追加并保留首轮失败，JSON 样例与格式检查通过；仍待 M0 对齐和 M2 真实 smoke。
+- - S3 `task_079ea15f53bf`：只读核验完成并交付 `mvp-s3-build-review.md`，指定验收命令退出码均为零；DuckDB 锁 `1.20000.1` 与缓存标记 `v2.0.0` 不一致，实际链接和运行时版本未知，静态检查不证明构建成功。
+- - S3 后续复验 `task_f1c51d6d490a`：复验段已追加，原失败和非零结果均保留；构建、实际链接和运行时版本仍未实测。
+- - M1 `task_cf842168c554`：本次未完成，不能交付 M2；另有端口冲突停止条件报告与格式化改动问题待协调处理。
+- 继续动作：本文件为唯一允许写入；未启动 worker、未接管 Run、未改业务代码；下一步由现有协调者裁决 S1/S2 失败与 M1 阻塞，本联络位等待事件。
+- 联络确认回复：已用自身会话身份对 `msg_baedd817881f` 发送 `orchestration reply`，返回 `{"ok":true,"result":{"messageId":"msg_88b16175de85"}}`；内容仅为收到确认与 inbox 转述，不含新任务指令。
+- 协调者新状态（`msg_635a2f00f6a5` 转述，未独立复验）：现协调者已接管 `run_02b4df14640f`；M1 原 dispatch 在 DNS 中断后呈 live/idle，已受控停止；首次重派因 `~/.zshrc` codex shell function 与 Orca 权限参数重复而启动失败，已释放并用显式 command codex 终端在同一 `task_cf842168c554` 重派 `ctx_37bc7b2c19a2`；S1/S2 失败保留历史，不新建 Run/worker；M2/M3 等 M1 真实报告后按依赖放行。
+- 边界重申：本联络位仅转述记录，不复验 M1 重派结果，不接管 Run，不新建 worker，不改业务代码。
+- 联络确认回复（`msg_635a2f00f6a5`）：已用自身会话身份发送 `orchestration reply`，返回 `{"ok":true,"result":{"messageId":"msg_16925ee7e2e0"}}`；内容仅为收到确认，不含新任务指令。

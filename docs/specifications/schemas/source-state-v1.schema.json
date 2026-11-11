@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iotfast.io/schemas/source-state-v1.schema.json",
+  "title": "IoTFast Southbound Source State Event v1 (iotfast.source_state.v1)",
+  "description": "Machine contract for POST /v1/source-state aligned with D00.2 decisions C02, Q03, and Q04. Separates connection state and point quality fault evidence from numerical measurements.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "spec",
+    "event_id",
+    "source_id",
+    "source_epoch",
+    "device_id",
+    "binding_revision_id",
+    "observed_at_ms",
+    "source_time_origin",
+    "source_seq",
+    "connection_state",
+    "point_states",
+    "delivery"
+  ],
+  "properties": {
+    "spec": {
+      "type": "string",
+      "const": "iotfast.source_state.v1",
+      "description": "Fixed wire specification identifier for southbound source state events."
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[!-~]{1,128}$",
+      "description": "Source-generated printable ASCII event identifier in the independent source_state idempotency domain."
+    },
+    "source_id": {
+      "$ref": "#/$defs/EntityId"
+    },
+    "source_epoch": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9_.:-]{1,64}$"
+    },
+    "device_id": {
+      "$ref": "#/$defs/EntityId"
+    },
+    "binding_revision_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[!-~]{1,128}$"
+    },
+    "observed_at_ms": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Timestamp in UTC Unix milliseconds when the connection or point quality state was observed."
+    },
+    "source_time_origin": {
+      "type": "string",
+      "enum": [
+        "device_clock",
+        "protocol_timestamp",
+        "gateway_sample"
+      ],
+      "description": "Time origin of the state observation (Q03/Q04)."
+    },
+    "source_seq": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20,
+      "pattern": "^(0|[1-9][0-9]{0,19})$",
+      "description": "Unsigned 64-bit decimal integer string for ordering state observations."
+    },
+    "connection_state": {
+      "type": "string",
+      "enum": [
+        "connected",
+        "degraded",
+        "disconnected",
+        "unknown"
+      ],
+      "description": "Gateway-to-device communication state. Disconnection alone updates freshness without overwriting point quality to bad (C02, Q04)."
+    },
+    "point_states": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {
+        "$ref": "#/$defs/SourcePointState"
+      },
+      "description": "Explicit point-level quality evidence (may be empty when reporting pure gateway connection state transition)."
+    },
+    "delivery": {
+      "$ref": "#/$defs/SourceStateDelivery"
+    }
+  },
+  "$defs": {
+    "EntityId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9][a-z0-9_-]{1,62}[a-z0-9]$"
+    },
+    "SourcePointState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "property",
+        "quality_state",
+        "quality_reason"
+      ],
+      "properties": {
+        "property": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_.-]{1,128}$"
+        },
+        "quality_state": {
+          "type": "string",
+          "enum": [
+            "good",
+            "uncertain",
+            "bad",
+            "unknown"
+          ]
+        },
+        "quality_reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "source_protocol": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "source_code": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        }
+      }
+    },
+    "SourceStateDelivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "replayed"
+      ],
+      "properties": {
+        "replayed": {
+          "type": "boolean",
+          "description": "Indicates replay; excluded from sha256-jcs-v1 event_hash calculation (Q04)."
+        }
+      }
+    },
+    "SourceStateReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "status"
+      ],
+      "properties": {
+        "http_status": {
+          "type": "integer",
+          "enum": [
+            200,
+            202
+          ]
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "accepted",
+            "duplicate"
+          ]
+        }
+      }
+    }
+  }
+}

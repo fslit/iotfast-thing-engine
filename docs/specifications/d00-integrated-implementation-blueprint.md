@@ -8,7 +8,9 @@
 
 权威约束：按请求认证服务身份并执行可信租户 / 资源 Scope；客户端不能自行填写角色 / tenant 授权；不依赖上层 UI 过滤。不存在同一进程或内网就自动豁免鉴权。最终用户认证与业务权限上层负责。
 
-## 2. 主分支审阅后的歧义清单
+> 2026-11-10 状态澄清：本文件同时保存了早期审阅和后续收敛记录。§2 的“候选”、§4.2/4.4 的“未交叉验证”、§5 的“BLOCKED”、§10 的“未构建”是当时记录，不是当前统一状态。现行设计规则由[身份公共契约](service-identity-and-scope-contract.md)、[遥测契约](p0-telemetry-contract.md)和[北向契约](northbound-api-and-subscription-contract.md)承载；有限验证见[证据更正](../development/evidence/p0-core-engine-test-summary.md)。已有状态事件文字定义不等于原型已满足；已有有限向量不等于完整 Schema 或正式冻结。尚未收敛的问题与下一步见[规范决策台账](../development/specification-decisions.md)，遇冲突不得依据本文件历史候选放宽边界。
+
+## 2. 主分支审阅后的歧义清单（历史发现，非当前阻塞状态）
 
 | ID | 发现于 main | 问题 / 影响 | 本蓝图建议及状态 |
 |---|---|---|---|

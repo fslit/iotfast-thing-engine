@@ -22,9 +22,9 @@
 | `model_revision_id` / `binding_revision_id` | 是 | 真实使用的已发布模型和绑定快照 |
 | `points` | 是 | 非空数组；单消息内 `property` 不得重复 |
 | `points[].property` | 是 | 模型定义且在所声明绑定中已绑定（`source_kind = "gateway_measurement"`） |
-| `points[].value` | 是 | 非 `null` 工程值；精确类型、有限数（禁止 `NaN/±Inf`）和范围根据模型校验 |
+| `points[].value` | 是 | 非 `null` 裸 JSON 工程值（`float64` / `int64` / `bool` / `string`，禁止包装为内部枚举对象）；精确类型、有限数（禁止 `NaN/±Inf`）和范围根据模型校验 |
 | `points[].source_at_ms` | 是 | 采样 UTC 毫秒；超出 `max_future_skew_ms` 时返回 `422 CLOCK_SKEW_EXCEEDED` 或隔离 |
-| `points[].source_time_origin` | 是 | 枚举：`device_clock` / `protocol_timestamp` / `gateway_sample`（网关无设备时钟时必填 `gateway_sample`） |
+| `points[].source_time_origin` | 是 | 南向遥测仅允许枚举：`device_clock` / `protocol_timestamp` / `gateway_sample`（网关无设备时钟时必填 `gateway_sample`；`external_source` 仅限外部引用路径，南向遥测传入返回 `422 VALIDATION_FAILED`） |
 | `points[].source_seq` | 是 | 十进制无符号 64 位整数字符串（`0..=18446744073709551615`）；同源同 epoch 同设备同点位内按整数语义单调递增 |
 | `points[].quality.state` | 是 | `good` / `uncertain` / `bad` / `unknown`；无新测量值的通信故障走 `iotfast.source_state.v1` |
 | `points[].quality.source_protocol` / `source_code` | 建议 | 源协议与原始质量码，支持缺失 / `null` |
@@ -36,10 +36,10 @@
 
 整消息经身份、设备 / 绑定、类型 / 值域和资源约束校验后才接受；任一错误返回 `422 VALIDATION_FAILED` 和字段级错误列表，整条无副作用。来源未授权返回 `403 SOURCE_NOT_AUTHORIZED`，同 key 内容冲突返回 `409 IDEMPOTENCY_CONFLICT`，绑定版本冲突返回 `409 REVISION_CONFLICT`，限流或容量不足返回 `429 RATE_LIMITED` / `503 DURABILITY_BACKPRESSURE`；统一错误体包含 `request_id`、`code`、`message`、`retryable`、`retry_after_ms`、`details`。
 
-- `accepted_volatile`：进入内存，重启可能丢失；HTTP `202`。
-- `accepted_durable`：已达到服务端声明的应用日志持久边界，可重放；HTTP `202`。不是历史查询已提交。
-- `duplicate`：相同 key 和语义内容返回原 `ingest_id` 与当前历史状态；HTTP `200`。
-- `GET /v1/ingestions/{ingest_id}`：按授权范围返回历史处理状态（`pending` / `committed` / `failed`）；状态保留期限应在部署策略公开。
+- `accepted_volatile`：进入内存，重启可能丢失；HTTP `202`（响应含 `request_id, ingest_id, message_id, status="accepted_volatile", history_status="pending"`）。
+- `accepted_durable`：已达到服务端声明的应用日志持久边界，可重放；HTTP `202`（响应含 `request_id, ingest_id, message_id, status="accepted_durable", history_status="pending"`）。不是历史查询已提交。
+- `duplicate`：相同 key 和语义内容返回原 `ingest_id` 与当前历史状态（`pending` / `committed` / `failed`）；HTTP `200`。
+- `GET /v1/ingestions/{ingest_id}`（Q12 冻结）：按授权范围返回双维度状态 `{ "request_id", "ingest_id", "message_id", "acceptance": "accepted_durable" | "accepted_volatile", "history_status": "pending" | "committed" | "failed", "updated_at_ms" }`；状态保留期限应在部署策略公开。
 
 客户端通过 `Prefer: durability=durable` 请求可靠接收时不可静默降级；服务端无法达成则失败。请求超时后以原 key 和业务内容重试，不生成新 ID。
 

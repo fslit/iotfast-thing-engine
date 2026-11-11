@@ -1,0 +1,4420 @@
+{
+  "openapi": "3.1.0",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "info": {
+    "title": "IoTFast Thing Model & UNS Data Engine API",
+    "version": "1.0.0",
+    "description": "Machine contract (OpenAPI 3.1) for the standalone IoTFast Thing Model & UNS Data Engine (`iotfast_server`), strictly aligned with D00.2 decisions Q01-Q12. Covers Control Plane catalog/asset/binding APIs, Southbound telemetry/state ingestion, Dual-Dimension ingestion status (`GET /v1/ingestions/{ingest_id}`), Northbound resource discovery, Device business view/shadow, History query, and WebSocket subscription frames (`subscription_terminated` vs `resync_required`)."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8080",
+      "description": "Local IoTFast Engine HTTP/WS Endpoint"
+    }
+  ],
+  "security": [
+    {
+      "SignedScopeToken": []
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Check engine runtime, DuckDB v2.0.0 link, SQLite WAL business store, and data directory health",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Engine is running and healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReport"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Engine is halted on WAL corruption or unhealthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReport"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/health": {
+      "get": {
+        "operationId": "getV1Health",
+        "summary": "Versioned health probe (/v1/health) returning DuckDB v2.0.0, SQLite WAL, and directory health",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Engine is running and healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReport"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Engine is halted on WAL corruption or unhealthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReport"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "livenessProbe",
+        "summary": "Container liveness probe (/healthz)",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Engine process is live",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReport"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Engine process is unhealthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReport"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "operationId": "readinessProbe",
+        "summary": "Container readiness probe (/readyz)",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Engine storage and WAL are ready to serve traffic",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReport"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Engine is not ready to serve traffic",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReport"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/products": {
+      "post": {
+        "operationId": "createProduct",
+        "summary": "Create a product definition (requires action product:write)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProductRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Product created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductRecord"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listProducts",
+        "summary": "List products in authenticated tenant scope",
+        "responses": {
+          "200": {
+            "description": "List of products",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProductRecord"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/products/{product_id}/models": {
+      "post": {
+        "operationId": "createProductModelDraft",
+        "summary": "Create a thing model draft under a specific product",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateModelDraftRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Model draft created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelRevisionRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/models": {
+      "post": {
+        "operationId": "createModelDraft",
+        "summary": "Create a thing model draft (state=draft)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateModelDraftRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Model draft created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelRevisionRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listModels",
+        "summary": "List thing model revisions in authenticated tenant scope",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Model revisions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ModelRevisionRecord"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/models:compare": {
+      "post": {
+        "operationId": "compareModels",
+        "summary": "Compare two model revisions and classify compatibility (compatible_extension vs breaking_change)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "from_revision_id",
+                  "to_revision_id"
+                ],
+                "properties": {
+                  "from_revision_id": {
+                    "type": "string"
+                  },
+                  "to_revision_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Compatibility diff report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelDiffReport"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/models/{model_revision_id}:validate": {
+      "post": {
+        "operationId": "validateModelDraft",
+        "summary": "Validate a thing model draft and optional compatibility against previous revision",
+        "parameters": [
+          {
+            "name": "model_revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "previous_published_revision_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validation report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelValidationReport"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/models/{model_revision_id}:publish": {
+      "post": {
+        "operationId": "publishModelRevision",
+        "summary": "Publish a model revision as an immutable snapshot (NB01)",
+        "parameters": [
+          {
+            "name": "model_revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "published_at_ms": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Published model revision record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelRevisionRecord"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/models/{model_revision_id}": {
+      "get": {
+        "operationId": "getModelRevision",
+        "summary": "Get immutable model revision details and property specifications",
+        "parameters": [
+          {
+            "name": "model_revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Model revision detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelRevisionDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/models/{model_revision_id}:diff": {
+      "get": {
+        "operationId": "diffModelRevisions",
+        "summary": "Compare a model revision against a target revision via query parameter (?target=...)",
+        "parameters": [
+          {
+            "name": "model_revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "target",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Target model revision ID to compare against"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Compatibility diff report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelDiffReport"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/assets": {
+      "post": {
+        "operationId": "createAsset",
+        "summary": "Create an asset hierarchy node",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAssetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Asset created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetRecord"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listAssets",
+        "summary": "List assets in authenticated scope",
+        "responses": {
+          "200": {
+            "description": "List of assets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AssetRecord"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets/relations": {
+      "post": {
+        "operationId": "createAssetRelation",
+        "summary": "Create a cross-tree topology relation between assets",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAssetRelationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Asset relation created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetRelationRecord"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets/{asset_id}/relations": {
+      "get": {
+        "operationId": "listAssetRelations",
+        "summary": "List active cross-tree relations for an asset",
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of asset relations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AssetRelationRecord"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/asset-relations": {
+      "post": {
+        "operationId": "createAssetRelationAlias",
+        "summary": "Create a cross-tree topology relation between assets (FEEDS / BACKUP_FOR / MONITORS)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAssetRelationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Asset relation created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetRelationRecord"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listAssetRelationsByQuery",
+        "summary": "List active cross-tree topology relations filtered by asset_id",
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of asset relations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AssetRelationRecord"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/devices": {
+      "post": {
+        "operationId": "instantiateDevice",
+        "summary": "Instantiate a device from a published model revision and allocate stable resource_ids (Q11)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstantiateDeviceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Device instantiated with resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceWithResources"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listDevices",
+        "summary": "List devices in authenticated scope",
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of devices",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DeviceWithResources"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/devices/{device_id}": {
+      "get": {
+        "operationId": "getDevice",
+        "summary": "Get device metadata and allocated resources",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceWithResources"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/devices/{device_id}:relocate": {
+      "post": {
+        "operationId": "relocateDevice",
+        "summary": "Relocate device to a new asset while preserving resource_ids and registering redirecting UNS paths (Q06, NB02)",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "target_asset_id"
+                ],
+                "properties": {
+                  "target_asset_id": {
+                    "type": "string"
+                  },
+                  "relocated_at_ms": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "redirect_retention_ms": {
+                    "type": "integer",
+                    "default": 86400000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated UNS path records and redirect retention deadline",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelocateDeviceResult"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/devices/{device_id}:upgrade-model": {
+      "post": {
+        "operationId": "upgradeDeviceModel",
+        "summary": "Upgrade device to a compatible model revision while preserving existing resource_ids (Q11)",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "target_model_revision_id",
+                  "expected_device_revision"
+                ],
+                "properties": {
+                  "target_model_revision_id": {
+                    "type": "string"
+                  },
+                  "expected_device_revision": {
+                    "type": "integer"
+                  },
+                  "upgraded_at_ms": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upgraded device record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceWithResources"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/devices/{device_id}/view": {
+      "get": {
+        "operationId": "getDeviceBusinessView",
+        "summary": "Get projected device business view with per-resource scope pruning (R09, NB03, NB04)",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device business view",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/device-view-v1.schema.json"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/devices/{device_id}/shadow": {
+      "get": {
+        "operationId": "getDeviceShadow",
+        "summary": "Get compact real-time device shadow with per-resource scope pruning",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device shadow view",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/device-view-v1.schema.json#/$defs/DeviceShadowView"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/devices/{device_id}/bindings": {
+      "post": {
+        "operationId": "createDeviceBindingDraft",
+        "summary": "Create a source binding draft for a device",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBindingDraftRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Binding draft created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BindingRevisionRecord"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/resources": {
+      "get": {
+        "operationId": "discoverOrResolveResources",
+        "summary": "Resolve a single UNS URI (including redirecting historical paths per Q06) or list scoped resources",
+        "parameters": [
+          {
+            "name": "uri",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asset_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "include_descendants",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uri_prefix",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resolved resource URI or scoped resource list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ResolvedResourceUri"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "items"
+                      ],
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/ResourceRecord"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/resources:resolve": {
+      "get": {
+        "operationId": "resolveResourceByUri",
+        "summary": "Resolve a single UNS URI (including redirecting historical paths per Q06) to its stable resource_id",
+        "parameters": [
+          {
+            "name": "uri",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resolved resource URI record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolvedResourceUri"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/sources/grants": {
+      "post": {
+        "operationId": "grantSourceDeviceAccess",
+        "summary": "Register southbound source gateway and grant authorization for a device (Q02)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "source_id",
+                  "device_id"
+                ],
+                "properties": {
+                  "source_id": {
+                    "type": "string"
+                  },
+                  "device_id": {
+                    "type": "string"
+                  },
+                  "valid_from_ms": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Source device grant registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "source_id",
+                    "device_id",
+                    "status"
+                  ],
+                  "properties": {
+                    "source_id": {
+                      "type": "string"
+                    },
+                    "device_id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "const": "granted"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/bindings": {
+      "post": {
+        "operationId": "createBindingDraft",
+        "summary": "Create a binding draft",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBindingDraftRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Binding draft created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BindingRevisionRecord"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/bindings/{binding_revision_id}": {
+      "get": {
+        "operationId": "getBindingRevision",
+        "summary": "Get binding revision snapshot",
+        "parameters": [
+          {
+            "name": "binding_revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Binding revision record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BindingRevisionRecord"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/bindings/{binding_revision_id}:validate": {
+      "post": {
+        "operationId": "validateBindingRevision",
+        "summary": "Validate binding point mappings, units, and gateway normalization rules",
+        "parameters": [
+          {
+            "name": "binding_revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Validated binding revision (status=ready)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BindingRevisionRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/bindings/{binding_revision_id}:activate": {
+      "post": {
+        "operationId": "activateBindingRevision",
+        "summary": "Activate binding snapshot via trusted gateway_ack or manual_stop_window (Q09)",
+        "parameters": [
+          {
+            "name": "binding_revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivateBindingHttpBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Binding activated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BindingRevisionRecord"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/telemetry": {
+      "post": {
+        "operationId": "ingestTelemetry",
+        "summary": "Ingest atomic southbound telemetry batch (`iotfast.telemetry.v1`)",
+        "parameters": [
+          {
+            "name": "Prefer",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "durability=durable",
+                "durability=volatile"
+              ]
+            },
+            "description": "Requested durability boundary. Defaults to durable; never silently downgrades."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/telemetry-v1.schema.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent duplicate telemetry batch recognized (status=duplicate)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/telemetry-v1.schema.json#/$defs/IngestReceipt"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Telemetry batch accepted at durable or volatile boundary (Q12)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/telemetry-v1.schema.json#/$defs/IngestReceipt"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/source-state": {
+      "post": {
+        "operationId": "reportSourceState",
+        "summary": "Report southbound gateway connection state and point quality fault evidence (`iotfast.source_state.v1`, Q04)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/source-state-v1.schema.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Duplicate source state event recognized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/source-state-v1.schema.json#/$defs/SourceStateReceipt"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Source state event accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/source-state-v1.schema.json#/$defs/SourceStateReceipt"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/ingestions/{ingest_id}": {
+      "get": {
+        "operationId": "getIngestionStatus",
+        "summary": "Query dual-dimension ingestion acceptance status (`status`) and historian projection progress (`history_status`) (Q12)",
+        "parameters": [
+          {
+            "name": "ingest_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dual-dimension ingestion status record (`status` + `history_status`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/telemetry-v1.schema.json#/$defs/IngestStatusRecord"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/history/query": {
+      "post": {
+        "operationId": "queryHistory",
+        "summary": "Execute constrained typed-AST history query with watermark snapshot & HMAC cursor (Q08)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/history-query-v1.schema.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "History query result with coverage and known_gaps disclosure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/history-query-v1.schema.json#/$defs/HistoryQueryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/subscriptions": {
+      "get": {
+        "operationId": "connectSubscriptionWebSocket",
+        "summary": "Upgrade to RFC 6455 WebSocket for boundary-S snapshot + bounded real-time delta stream (Q05)",
+        "parameters": [
+          {
+            "name": "Sec-WebSocket-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "101": {
+            "description": "Switching Protocols to WebSocket stream (emits snapshot_begin, snapshot_chunk, snapshot_end, delta, resync_required, or subscription_terminated frames)"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/storage/status": {
+      "get": {
+        "operationId": "getStorageArchitectureStatus",
+        "summary": "Get SQLite business metadata store and pluggable time-series adapter (DuckDB / TDengine / TimescaleDB / ClickHouse) status",
+        "responses": {
+          "200": {
+            "description": "Storage architecture status snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageArchitectureStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/storage/timeseries-adapter": {
+      "post": {
+        "operationId": "configureTimeSeriesAdapter",
+        "summary": "Dynamically switch or configure the device time-series storage adapter (duckdb, tdengine, timescaledb, clickhouse)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigureTimeSeriesAdapterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated storage architecture status after switching adapter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageArchitectureStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/storage/query-plan": {
+      "post": {
+        "operationId": "buildTimeSeriesQueryPlan",
+        "summary": "Preview the native history or time-bucket aggregate SQL query plan generated by the active time-series adapter",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuildQueryPlanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Native SQL query plan for the active time-series backend",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeSeriesQueryPlan"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/storage/capabilities": {
+      "get": {
+        "operationId": "getStorageCapabilities",
+        "summary": "Get capability matrix and active capability snapshot across pluggable time-series backends (ST-02)",
+        "responses": {
+          "200": {
+            "description": "Time-series storage backend capabilities snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageCapabilitiesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/storage/checkpoints": {
+      "get": {
+        "operationId": "getStorageDeliveryCheckpoints",
+        "summary": "Get contiguous WAL delivery checkpoint and unreconciled delivery holes for a time-series backend (ST-04)",
+        "parameters": [
+          {
+            "name": "backend",
+            "in": "query",
+            "required": false,
+            "description": "目标时序存储后端（默认当前激活后端）",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "duckdb",
+                "tdengine",
+                "timescaledb",
+                "clickhouse"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contiguous delivery checkpoint summary and delivery holes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryCheckpointSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/storage/checkpoints:reconcile": {
+      "post": {
+        "operationId": "reconcileStorageDeliveryHole",
+        "summary": "Reconcile or isolate an unreconciled time-series delivery hole and advance the contiguous checkpoint (ST-04)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileDeliveryHoleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated delivery checkpoint summary after reconciling or isolating hole",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryCheckpointSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/storage/backups": {
+      "post": {
+        "operationId": "createStorageBackup",
+        "summary": "Create a consistent online snapshot backup of SQLite business metadata, DuckDB time-series tables, and AppWal (D10.1)",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBackupRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Consistent snapshot backup created with SHA-256 manifest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupManifest"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listStorageBackups",
+        "summary": "List consistent snapshot backup manifests (D10.1)",
+        "responses": {
+          "200": {
+            "description": "List of snapshot backup manifests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/storage/backups/{backup_id}:verify": {
+      "post": {
+        "operationId": "verifyStorageBackup",
+        "summary": "Verify snapshot backup SHA-256 digests and perform isolated sandbox restore verification (D10.1)",
+        "parameters": [
+          {
+            "name": "backup_id",
+            "in": "path",
+            "required": true,
+            "description": "快照备份唯一标识",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyBackupRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Isolated backup restore verification report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupVerifyReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/adapters": {
+      "post": {
+        "operationId": "registerEdgeAdapter",
+        "summary": "Register or update an edge protocol adapter capability profile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EdgeAdapterCapability"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Edge adapter capability registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EdgeAdapterCapability"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listEdgeAdapters",
+        "summary": "List registered edge protocol adapter capability profiles in authenticated tenant scope",
+        "responses": {
+          "200": {
+            "description": "List of edge adapter capability profiles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EdgeAdapterCapability"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/adapters/{adapter_id}:validate-binding": {
+      "post": {
+        "operationId": "validateAdapterBinding",
+        "summary": "Validate point binding value_type, transform, batch_size, and deadband requirements against an edge adapter capability profile",
+        "parameters": [
+          {
+            "name": "adapter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateAdapterBindingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Binding requirements are compatible with the edge adapter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidateAdapterBindingResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/derived-metrics": {
+      "post": {
+        "operationId": "createDerivedMetric",
+        "summary": "Create or update a deterministic thing-model derived metric definition",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DerivedMetricDefinition"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Derived metric definition registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DerivedMetricDefinition"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listDerivedMetrics",
+        "summary": "List derived metric definitions in authenticated tenant scope",
+        "responses": {
+          "200": {
+            "description": "List of derived metric definitions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DerivedMetricDefinition"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/derived-metrics/{metric_id}:evaluate": {
+      "post": {
+        "operationId": "evaluateDerivedMetric",
+        "summary": "Evaluate a derived metric against a device business view while enforcing input quality/freshness policies and returning input lineage",
+        "parameters": [
+          {
+            "name": "metric_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluateDerivedMetricRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Evaluated derived metric value with per-input lineage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluateDerivedMetricResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/ping": {
+      "get": {
+        "operationId": "northboundPing",
+        "summary": "Authenticated northbound and control-plane connectivity probe",
+        "responses": {
+          "200": {
+            "description": "Northbound ping response with verified tenant_id and caller_service_id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PingResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/ingest/ping": {
+      "get": {
+        "operationId": "southboundIngestPing",
+        "summary": "Authenticated southbound gateway ingestion connectivity and WAL readiness probe",
+        "responses": {
+          "200": {
+            "description": "Southbound ingest ping response with WAL readiness status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PingResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "SignedScopeToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "iotfast1.<base64url>.<hmac_sha256_hex>",
+        "description": "HMAC-SHA256 signed service token bound to VerifiedScopeContext (Q02). Client-reported scope headers (X-Tenant-Id, X-Role, etc.) are strictly rejected with 422 VALIDATION_FAILED."
+      }
+    },
+    "responses": {
+      "ErrorResponse": {
+        "description": "Standard IoTFast error envelope",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelopeWrapper"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "FieldIssue": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "field",
+          "issue",
+          "description"
+        ],
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "issue": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "EngineError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "request_id",
+          "code",
+          "message",
+          "retryable",
+          "details"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "UNAUTHENTICATED",
+              "FORBIDDEN_ACTION",
+              "SOURCE_NOT_AUTHORIZED",
+              "RESOURCE_NOT_FOUND",
+              "IDEMPOTENCY_CONFLICT",
+              "REVISION_CONFLICT",
+              "VALIDATION_FAILED",
+              "CLOCK_SKEW_EXCEEDED",
+              "CROSS_VERSION_INCOMPATIBLE",
+              "CAPABILITY_UNSUPPORTED",
+              "RATE_LIMITED",
+              "DURABILITY_BACKPRESSURE",
+              "SOURCE_UNAVAILABLE",
+              "SERVICE_UNAVAILABLE",
+              "INTERNAL_ERROR"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "retry_after_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldIssue"
+            }
+          }
+        }
+      },
+      "ErrorEnvelopeWrapper": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/EngineError"
+          }
+        }
+      },
+      "HealthReport": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "healthy",
+          "duckdb_version",
+          "duckdb_source_id",
+          "data_dir_writable",
+          "wal_dir_writable"
+        ],
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "Running",
+              "HaltedOnWalCorruption"
+            ]
+          },
+          "healthy": {
+            "type": "boolean"
+          },
+          "duckdb_version": {
+            "type": "string"
+          },
+          "duckdb_source_id": {
+            "type": "string"
+          },
+          "sqlite_version": {
+            "type": "string"
+          },
+          "sqlite_business_db_writable": {
+            "type": "boolean"
+          },
+          "data_dir_writable": {
+            "type": "boolean"
+          },
+          "wal_dir_writable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CreateProductRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "product_id",
+          "product_key",
+          "name"
+        ],
+        "properties": {
+          "product_id": {
+            "type": "string"
+          },
+          "product_key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "ProductRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "product_id",
+          "tenant_id",
+          "product_key",
+          "name"
+        ],
+        "properties": {
+          "product_id": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "product_key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "ModelPropertyDraft": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "identifier",
+          "name",
+          "value_type",
+          "required"
+        ],
+        "properties": {
+          "identifier": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "value_type": {
+            "type": "string",
+            "enum": [
+              "float64",
+              "int64",
+              "bool",
+              "text"
+            ]
+          },
+          "unit_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unit_symbol": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min_value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "max_value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CreateModelDraftRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "model_revision_id",
+          "model_version",
+          "properties"
+        ],
+        "properties": {
+          "model_revision_id": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "model_version": {
+            "type": "string"
+          },
+          "properties": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/ModelPropertyDraft"
+            }
+          }
+        }
+      },
+      "ModelRevisionRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "model_revision_id",
+          "tenant_id",
+          "product_id",
+          "model_version",
+          "status",
+          "model_hash"
+        ],
+        "properties": {
+          "model_revision_id": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "model_version": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "validated",
+              "published"
+            ]
+          },
+          "model_hash": {
+            "type": "string"
+          },
+          "published_at_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        }
+      },
+      "ModelRevisionDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "model_revision_id",
+          "tenant_id",
+          "product_id",
+          "model_version",
+          "status",
+          "model_hash",
+          "properties"
+        ],
+        "properties": {
+          "model_revision_id": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "model_version": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "model_hash": {
+            "type": "string"
+          },
+          "published_at_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "properties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModelPropertyDraft"
+            }
+          }
+        }
+      },
+      "ModelValidationReport": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "model_revision_id",
+          "valid",
+          "compatibility",
+          "issues"
+        ],
+        "properties": {
+          "model_revision_id": {
+            "type": "string"
+          },
+          "valid": {
+            "type": "boolean"
+          },
+          "compatibility": {
+            "type": "string",
+            "enum": [
+              "initial",
+              "compatible_extension",
+              "breaking_change"
+            ]
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldIssue"
+            }
+          }
+        }
+      },
+      "ModelDiffReport": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "from_revision_id",
+          "to_revision_id",
+          "compatibility",
+          "added_properties",
+          "removed_properties",
+          "breaking_properties"
+        ],
+        "properties": {
+          "from_revision_id": {
+            "type": "string"
+          },
+          "to_revision_id": {
+            "type": "string"
+          },
+          "compatibility": {
+            "type": "string",
+            "enum": [
+              "initial",
+              "compatible_extension",
+              "breaking_change"
+            ]
+          },
+          "added_properties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "removed_properties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "breaking_properties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CreateAssetRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "asset_id",
+          "slug",
+          "name"
+        ],
+        "properties": {
+          "asset_id": {
+            "type": "string"
+          },
+          "parent_asset_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "AssetRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "asset_id",
+          "tenant_id",
+          "slug",
+          "name",
+          "asset_path"
+        ],
+        "properties": {
+          "asset_id": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "parent_asset_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "asset_path": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateAssetRelationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "relation_id",
+          "from_asset_id",
+          "relation_type",
+          "to_asset_id",
+          "valid_from_ms",
+          "source"
+        ],
+        "properties": {
+          "relation_id": {
+            "type": "string"
+          },
+          "from_asset_id": {
+            "type": "string"
+          },
+          "relation_type": {
+            "type": "string"
+          },
+          "to_asset_id": {
+            "type": "string"
+          },
+          "valid_from_ms": {
+            "type": "integer"
+          },
+          "valid_to_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      },
+      "AssetRelationRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "relation_id",
+          "tenant_id",
+          "from_asset_id",
+          "relation_type",
+          "to_asset_id",
+          "valid_from_ms",
+          "source",
+          "revision"
+        ],
+        "properties": {
+          "relation_id": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "from_asset_id": {
+            "type": "string"
+          },
+          "relation_type": {
+            "type": "string"
+          },
+          "to_asset_id": {
+            "type": "string"
+          },
+          "valid_from_ms": {
+            "type": "integer"
+          },
+          "valid_to_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "source": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer"
+          }
+        }
+      },
+      "InstantiateDeviceRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "device_id",
+          "device_key",
+          "device_name",
+          "product_id",
+          "model_revision_id",
+          "asset_id"
+        ],
+        "properties": {
+          "device_id": {
+            "type": "string"
+          },
+          "device_key": {
+            "type": "string"
+          },
+          "device_name": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "model_revision_id": {
+            "type": "string"
+          },
+          "asset_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ResourceRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resource_id",
+          "tenant_id",
+          "device_id",
+          "property",
+          "name",
+          "canonical_uri"
+        ],
+        "properties": {
+          "resource_id": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "property": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "canonical_uri": {
+            "type": "string"
+          }
+        }
+      },
+      "DeviceWithResources": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "device_id",
+          "tenant_id",
+          "device_key",
+          "device_name",
+          "product_id",
+          "model_revision_id",
+          "asset_id",
+          "canonical_device_uri",
+          "revision",
+          "resources"
+        ],
+        "properties": {
+          "device_id": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "device_key": {
+            "type": "string"
+          },
+          "device_name": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "model_revision_id": {
+            "type": "string"
+          },
+          "asset_id": {
+            "type": "string"
+          },
+          "canonical_device_uri": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceRecord"
+            }
+          }
+        }
+      },
+      "ResourcePathRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resource_id",
+          "canonical_uri",
+          "previous_uri",
+          "redirect_until_ms"
+        ],
+        "properties": {
+          "resource_id": {
+            "type": "string"
+          },
+          "canonical_uri": {
+            "type": "string"
+          },
+          "previous_uri": {
+            "type": "string"
+          },
+          "redirect_until_ms": {
+            "type": "integer"
+          }
+        }
+      },
+      "RelocateDeviceResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "records",
+          "redirect_until_ms"
+        ],
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourcePathRecord"
+            }
+          },
+          "redirect_until_ms": {
+            "type": "integer"
+          }
+        }
+      },
+      "ResolvedResourceUri": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resource_id",
+          "device_id",
+          "property",
+          "canonical_uri",
+          "matched_path_state"
+        ],
+        "properties": {
+          "resource_id": {
+            "type": "string"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "property": {
+            "type": "string"
+          },
+          "canonical_uri": {
+            "type": "string"
+          },
+          "matched_path_state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "redirected"
+            ]
+          }
+        }
+      },
+      "PointBindingDraft": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "property",
+          "register_address",
+          "factor"
+        ],
+        "properties": {
+          "property": {
+            "type": "string"
+          },
+          "register_address": {
+            "type": "string"
+          },
+          "factor": {
+            "type": "number"
+          },
+          "unit_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deadband": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "heartbeat_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        }
+      },
+      "StaticPropertyBindingDraft": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "property",
+          "value"
+        ],
+        "properties": {
+          "property": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "number",
+              "integer",
+              "boolean",
+              "string"
+            ]
+          },
+          "unit_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CreateBindingDraftRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "binding_revision_id",
+          "model_revision_id",
+          "source_id"
+        ],
+        "properties": {
+          "binding_revision_id": {
+            "type": "string"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "model_revision_id": {
+            "type": "string"
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "normalization_owner": {
+            "type": "string",
+            "default": "gateway",
+            "enum": [
+              "gateway"
+            ]
+          },
+          "server_scale_factor": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PointBindingDraft"
+            }
+          },
+          "static_points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaticPropertyBindingDraft"
+            }
+          }
+        }
+      },
+      "GatewayBindingAck": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_id",
+          "source_epoch",
+          "binding_revision_id",
+          "config_hash",
+          "acknowledged_at_ms"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string"
+          },
+          "source_epoch": {
+            "type": "string"
+          },
+          "binding_revision_id": {
+            "type": "string"
+          },
+          "config_hash": {
+            "type": "string"
+          },
+          "acknowledged_at_ms": {
+            "type": "integer"
+          }
+        }
+      },
+      "ManualStopWindow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "window_start_ms",
+          "window_end_ms",
+          "operator_id"
+        ],
+        "properties": {
+          "window_start_ms": {
+            "type": "integer"
+          },
+          "window_end_ms": {
+            "type": "integer"
+          },
+          "operator_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ActivateBindingHttpBody": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expected_device_revision"
+        ],
+        "properties": {
+          "expected_device_revision": {
+            "type": "integer"
+          },
+          "activated_at_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "gateway_ack": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GatewayBindingAck"
+              }
+            ]
+          },
+          "manual_stop_window": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ManualStopWindow"
+              }
+            ]
+          }
+        }
+      },
+      "BindingRevisionRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "binding_revision_id",
+          "tenant_id",
+          "device_id",
+          "model_revision_id",
+          "source_id",
+          "normalization_owner",
+          "status",
+          "config_hash"
+        ],
+        "properties": {
+          "binding_revision_id": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "model_revision_id": {
+            "type": "string"
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "normalization_owner": {
+            "type": "string"
+          },
+          "server_scale_factor": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "ready",
+              "active",
+              "superseded"
+            ]
+          },
+          "config_hash": {
+            "type": "string"
+          },
+          "valid_from_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "valid_to_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        }
+      },
+      "WsSubscribeFrame": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "resource_ids"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "subscribe"
+          },
+          "sub_id": {
+            "type": "string"
+          },
+          "resource_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "include_initial_snapshot": {
+            "type": "boolean",
+            "default": true
+          },
+          "max_pending_events": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 64
+          }
+        }
+      },
+      "WsSnapshotBeginFrame": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "sub_id",
+          "server_sub_id",
+          "stream_epoch",
+          "snapshot_boundary_seq"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "snapshot_begin"
+          },
+          "sub_id": {
+            "type": "string"
+          },
+          "server_sub_id": {
+            "type": "string"
+          },
+          "stream_epoch": {
+            "type": "string"
+          },
+          "snapshot_boundary_seq": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "WsSnapshotChunkFrame": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "sub_id",
+          "server_sub_id",
+          "items"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "snapshot_chunk"
+          },
+          "sub_id": {
+            "type": "string"
+          },
+          "server_sub_id": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "resource_id",
+                "resource_revision",
+                "value",
+                "quality",
+                "freshness",
+                "value_sampled_at_ms"
+              ],
+              "properties": {
+                "resource_id": {
+                  "type": "string"
+                },
+                "resource_revision": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "value": {
+                  "type": [
+                    "number",
+                    "integer",
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "quality": {
+                  "type": "string",
+                  "enum": [
+                    "good",
+                    "uncertain",
+                    "bad",
+                    "unknown"
+                  ]
+                },
+                "freshness": {
+                  "type": "string",
+                  "enum": [
+                    "fresh",
+                    "stale",
+                    "static",
+                    "unknown"
+                  ]
+                },
+                "value_sampled_at_ms": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "WsSnapshotEndFrame": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "sub_id",
+          "server_sub_id",
+          "snapshot_boundary_seq"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "snapshot_end"
+          },
+          "sub_id": {
+            "type": "string"
+          },
+          "server_sub_id": {
+            "type": "string"
+          },
+          "snapshot_boundary_seq": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "WsDeltaFrame": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "sub_id",
+          "server_sub_id",
+          "stream_epoch",
+          "stream_seq",
+          "resource_id",
+          "value",
+          "quality",
+          "observed_at_ms"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "delta"
+          },
+          "sub_id": {
+            "type": "string"
+          },
+          "server_sub_id": {
+            "type": "string"
+          },
+          "stream_epoch": {
+            "type": "string"
+          },
+          "stream_seq": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "resource_id": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "number",
+              "integer",
+              "boolean",
+              "string"
+            ]
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "good",
+              "uncertain",
+              "bad",
+              "unknown"
+            ]
+          },
+          "observed_at_ms": {
+            "type": "integer"
+          }
+        }
+      },
+      "WsResyncRequiredFrame": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "sub_id",
+          "server_sub_id",
+          "reason",
+          "message",
+          "action"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "resync_required",
+            "description": "Emitted ONLY when authorization remains valid but pending delta buffer overflowed or snapshot boundary S was violated (Q05, T09, NB06)."
+          },
+          "sub_id": {
+            "type": "string"
+          },
+          "server_sub_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "BUFFER_OVERFLOW",
+              "SNAPSHOT_BOUNDARY_VIOLATED"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "const": "reconnect_and_resubscribe_with_snapshot"
+          }
+        }
+      },
+      "WsSubscriptionTerminatedFrame": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "sub_id",
+          "server_sub_id",
+          "reason",
+          "message",
+          "action"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "subscription_terminated",
+            "description": "Emitted when subscriber session credential expires or scope is revoked (Q05, SC10). Distinct from resync_required."
+          },
+          "sub_id": {
+            "type": "string"
+          },
+          "server_sub_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "CREDENTIAL_EXPIRED",
+              "SCOPE_REVOKED"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "const": "reauthenticate_and_resubscribe"
+          }
+        }
+      },
+      "BusinessStoreStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "engine",
+          "sqlite_version",
+          "db_path",
+          "journal_mode",
+          "tables",
+          "row_counts"
+        ],
+        "properties": {
+          "engine": {
+            "type": "string",
+            "const": "sqlite"
+          },
+          "sqlite_version": {
+            "type": "string"
+          },
+          "db_path": {
+            "type": "string"
+          },
+          "journal_mode": {
+            "type": "string"
+          },
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "row_counts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      },
+      "TdengineConfig": {
+        "type": "object",
+        "description": "一期默认启用 SQLite + DuckDB + AppWal；外部 TDengine (taosd) 集群实连验收（ST-06）规划在二期启用。",
+        "additionalProperties": false,
+        "required": [
+          "endpoint",
+          "database",
+          "super_table",
+          "username",
+          "password",
+          "execution_mode"
+        ],
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "default": "http://127.0.0.1:6041"
+          },
+          "database": {
+            "type": "string",
+            "default": "iotfast_tsdb"
+          },
+          "super_table": {
+            "type": "string",
+            "default": "stb_observations"
+          },
+          "username": {
+            "type": "string",
+            "default": "root"
+          },
+          "password": {
+            "type": "string",
+            "default": "taosdata",
+            "description": "TDengine password for outbound REST authentication. Always redacted to '***REDACTED***' in status/API responses."
+          },
+          "execution_mode": {
+            "type": "string",
+            "enum": [
+              "local_mirror_with_sql_spool",
+              "http_rest"
+            ],
+            "default": "local_mirror_with_sql_spool"
+          }
+        }
+      },
+      "CapabilityLevel": {
+        "type": "string",
+        "enum": [
+          "supported",
+          "unsupported",
+          "conditional",
+          "unverified"
+        ]
+      },
+      "BackendCapabilitySnapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "backend",
+          "exact_id_roundtrip",
+          "same_timestamp_distinct",
+          "replay_idempotent",
+          "duplicate_conflict_detect",
+          "batch_result_scope",
+          "snapshot_pagination",
+          "quality_roundtrip",
+          "notes"
+        ],
+        "properties": {
+          "backend": {
+            "type": "string",
+            "enum": [
+              "duckdb",
+              "tdengine",
+              "timescaledb",
+              "clickhouse"
+            ]
+          },
+          "exact_id_roundtrip": {
+            "$ref": "#/components/schemas/CapabilityLevel"
+          },
+          "same_timestamp_distinct": {
+            "$ref": "#/components/schemas/CapabilityLevel"
+          },
+          "replay_idempotent": {
+            "$ref": "#/components/schemas/CapabilityLevel"
+          },
+          "duplicate_conflict_detect": {
+            "$ref": "#/components/schemas/CapabilityLevel"
+          },
+          "batch_result_scope": {
+            "$ref": "#/components/schemas/CapabilityLevel"
+          },
+          "snapshot_pagination": {
+            "$ref": "#/components/schemas/CapabilityLevel"
+          },
+          "quality_roundtrip": {
+            "$ref": "#/components/schemas/CapabilityLevel"
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "StorageCapabilitiesResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "active_backend",
+          "active_capabilities",
+          "backends"
+        ],
+        "properties": {
+          "active_backend": {
+            "type": "string",
+            "enum": [
+              "duckdb",
+              "tdengine",
+              "timescaledb",
+              "clickhouse"
+            ]
+          },
+          "active_capabilities": {
+            "$ref": "#/components/schemas/BackendCapabilitySnapshot"
+          },
+          "backends": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BackendCapabilitySnapshot"
+            }
+          }
+        }
+      },
+      "DeliveryHoleRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "wal_position",
+          "ingest_id",
+          "target_backend",
+          "status",
+          "recorded_at_ms"
+        ],
+        "properties": {
+          "wal_position": {
+            "type": "string"
+          },
+          "ingest_id": {
+            "type": "string"
+          },
+          "target_backend": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "retryable",
+              "permanent_rejected",
+              "isolated_gap"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "operator_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recorded_at_ms": {
+            "type": "integer"
+          }
+        }
+      },
+      "DeliveryCheckpointSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "target_backend",
+          "committed_count",
+          "isolated_gap_count",
+          "unknown_count",
+          "retryable_count",
+          "permanent_rejected_count",
+          "has_unreconciled_holes",
+          "holes"
+        ],
+        "properties": {
+          "target_backend": {
+            "type": "string"
+          },
+          "contiguous_checkpoint_wal_pos": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "highest_seen_wal_pos": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "committed_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "isolated_gap_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unknown_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "retryable_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "permanent_rejected_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "has_unreconciled_holes": {
+            "type": "boolean"
+          },
+          "holes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryHoleRecord"
+            }
+          }
+        }
+      },
+      "ReconcileDeliveryHoleRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "wal_position",
+          "resolution",
+          "reason",
+          "operator_id"
+        ],
+        "properties": {
+          "target_backend": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "wal_position": {
+            "type": "string",
+            "minLength": 1
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "mark_committed",
+              "isolate_gap"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operator_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "CreateBackupRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "backup_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "VerifyBackupRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "BackupFileEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "relative_path",
+          "size_bytes",
+          "sha256_hex"
+        ],
+        "properties": {
+          "relative_path": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256_hex": {
+            "type": "string"
+          }
+        }
+      },
+      "BackupManifest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "backup_id",
+          "created_at_ms",
+          "stream_epoch",
+          "sqlite_table_counts",
+          "duckdb_timeseries_counts",
+          "files"
+        ],
+        "properties": {
+          "backup_id": {
+            "type": "string"
+          },
+          "created_at_ms": {
+            "type": "integer"
+          },
+          "stream_epoch": {
+            "type": "string"
+          },
+          "wal_checkpoint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sqlite_table_counts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "duckdb_timeseries_counts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BackupFileEntry"
+            }
+          }
+        }
+      },
+      "BackupListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BackupManifest"
+            }
+          }
+        }
+      },
+      "BackupVerifyReport": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "backup_id",
+          "verified",
+          "checked_files",
+          "restored_sqlite_tables",
+          "restored_devices",
+          "restored_history_observations",
+          "restored_latest_values",
+          "wal_replayed_messages",
+          "issues"
+        ],
+        "properties": {
+          "backup_id": {
+            "type": "string"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "checked_files": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "restored_sqlite_tables": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "restored_devices": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "restored_history_observations": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "restored_latest_values": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "wal_replayed_messages": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "TimeSeriesStoreStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "active_backend",
+          "capabilities",
+          "supported_backends",
+          "duckdb_path",
+          "tdengine_config",
+          "tdengine_super_table_ddl",
+          "recent_tdengine_sql_log",
+          "tables",
+          "row_counts"
+        ],
+        "properties": {
+          "active_backend": {
+            "type": "string",
+            "enum": [
+              "duckdb",
+              "tdengine",
+              "timescaledb",
+              "clickhouse"
+            ]
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/BackendCapabilitySnapshot"
+          },
+          "supported_backends": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "duckdb",
+                "tdengine",
+                "timescaledb",
+                "clickhouse"
+              ]
+            }
+          },
+          "duckdb_path": {
+            "type": "string"
+          },
+          "tdengine_config": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TdengineConfig"
+              }
+            ]
+          },
+          "tdengine_super_table_ddl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recent_tdengine_sql_log": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "row_counts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      },
+      "StorageArchitectureStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "architecture",
+          "business_metadata_store",
+          "device_timeseries_store"
+        ],
+        "properties": {
+          "architecture": {
+            "type": "string"
+          },
+          "business_metadata_store": {
+            "$ref": "#/components/schemas/BusinessStoreStatus"
+          },
+          "device_timeseries_store": {
+            "$ref": "#/components/schemas/TimeSeriesStoreStatus"
+          }
+        }
+      },
+      "ConfigureTimeSeriesAdapterRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "backend"
+        ],
+        "properties": {
+          "backend": {
+            "type": "string",
+            "enum": [
+              "duckdb",
+              "tdengine",
+              "timescaledb",
+              "clickhouse"
+            ]
+          },
+          "tdengine": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TdengineConfig"
+              }
+            ]
+          },
+          "strict_lossless": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "SwitchTimeSeriesAdapterRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "backend"
+        ],
+        "properties": {
+          "backend": {
+            "type": "string",
+            "enum": [
+              "duckdb",
+              "tdengine",
+              "timescaledb",
+              "clickhouse"
+            ]
+          },
+          "tdengine": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TdengineConfig"
+              }
+            ]
+          },
+          "strict_lossless": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "BuildQueryPlanRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resource_ids",
+          "start_ms",
+          "end_ms"
+        ],
+        "properties": {
+          "resource_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "start_ms": {
+            "type": "integer"
+          },
+          "end_ms": {
+            "type": "integer"
+          },
+          "bucket_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          }
+        }
+      },
+      "TimeSeriesQueryPlan": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "backend",
+          "mode",
+          "native_sql"
+        ],
+        "properties": {
+          "backend": {
+            "type": "string",
+            "enum": [
+              "duckdb",
+              "tdengine",
+              "timescaledb",
+              "clickhouse"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "raw",
+              "aggregate"
+            ]
+          },
+          "native_sql": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "EdgeAdapterCapability": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "adapter_id",
+          "protocol",
+          "supported_value_types",
+          "supported_transforms",
+          "max_batch_size",
+          "supports_deadband"
+        ],
+        "properties": {
+          "adapter_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string",
+            "minLength": 1
+          },
+          "supported_value_types": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "supported_transforms": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "max_batch_size": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "supports_deadband": {
+            "type": "boolean"
+          },
+          "updated_at_ms": {
+            "type": "integer"
+          }
+        }
+      },
+      "ValidateAdapterBindingRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value_type",
+          "transform",
+          "batch_size",
+          "requires_deadband"
+        ],
+        "properties": {
+          "value_type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "transform": {
+            "type": "string",
+            "minLength": 1
+          },
+          "batch_size": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "requires_deadband": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ValidateAdapterBindingResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "adapter_id",
+          "compatible",
+          "checked_at_ms"
+        ],
+        "properties": {
+          "adapter_id": {
+            "type": "string"
+          },
+          "compatible": {
+            "type": "boolean"
+          },
+          "checked_at_ms": {
+            "type": "integer"
+          }
+        }
+      },
+      "DerivedMetricDefinition": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "name",
+          "product_id",
+          "model_revision_id",
+          "expression",
+          "input_properties"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "product_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model_revision_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expression": {
+            "type": "string",
+            "minLength": 1
+          },
+          "input_properties": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "output_unit_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quality_policy": {
+            "type": "string",
+            "enum": [
+              "reject_on_bad",
+              "good_only",
+              "propagate_bad"
+            ],
+            "default": "reject_on_bad"
+          },
+          "created_at_ms": {
+            "type": "integer"
+          }
+        }
+      },
+      "EvaluateDerivedMetricRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "device_id"
+        ],
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evaluated_at_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        }
+      },
+      "EvaluateDerivedMetricResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "device_id",
+          "expression",
+          "computed_value",
+          "unit_code",
+          "quality",
+          "evaluated_at_ms",
+          "inputs_lineage"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "expression": {
+            "type": "string"
+          },
+          "computed_value": {
+            "type": "number"
+          },
+          "unit_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "good",
+              "uncertain",
+              "bad"
+            ]
+          },
+          "evaluated_at_ms": {
+            "type": "integer"
+          },
+          "inputs_lineage": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "PingResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "plane",
+          "tenant_id",
+          "caller_service_id",
+          "server_time_ms"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok"
+          },
+          "plane": {
+            "type": "string",
+            "enum": [
+              "northbound",
+              "southbound_ingest"
+            ]
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "caller_service_id": {
+            "type": "string"
+          },
+          "wal_ready": {
+            "type": "boolean"
+          },
+          "server_time_ms": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

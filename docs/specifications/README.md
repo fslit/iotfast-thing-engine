@@ -45,6 +45,24 @@ OEE、能耗和衍生指标与模型的结合参见 [衍生指标与算法设计
 
 涉及引擎与上层职责，以数据引擎定位规范为准；其余同一 P0 问题，第二部分（18–28 节）覆盖第一部分的通用或可选设计；本页和任务表只作索引。若第二部分自身出现冲突，记录问题并更新权威设计及示例后再实现，不自行选择更宽松的行为。若新增 ADR 或经过评审的正式契约改变设计，应在该变更中同步更新正文与本页，注明生效范围和迁移方式。
 
-## 当前契约状态
+## 产品与实施导航
 
-JSON 示例是设计样例，已经过 JSON 语法检查；并非已发布的完整 JSON Schema、OpenAPI 或可运行服务契约。生产接入前需补全并实际验证字段、错误、兼容性、鉴权和版本策略。
+- [产品基线](../../PRODUCT.md)：定位、使用者、范围、成功标准；不覆盖 wire 字段。
+- [接入与体验规范](../product/integration-experience.md)：API 接入旅程、上层参考交互、异常状态和 UX 验收；不新增引擎页面任务。
+- [实现架构](../architecture/implementation-architecture.md)：模块职责、时序、事务、运维及现状差距。
+- [AI 执行任务包](../development/ai-execution-plan.md)：细分任务卡、依赖、DoR / DoD、测试追踪与停止条件。
+- [规范决策台账](../development/specification-decisions.md)：已解决冲突、待冻结规则、现场输入和证据编号。
+- [本轮规范审查记录](../development/evidence/2026-11-10-specification-review.md)：变更范围、检查方法、结果与未执行项。
+
+这些文件是执行与验收细化，不成为另一套字段契约。职责以定位规范为准，wire 仍依现有优先级；台账中待冻结项完成前，受影响实现不得自行选择。设计基线、机器契约冻结、原型测试、现场验收是四种不同状态。
+
+## 当前契约状态与机器可读产物（2026-11-11）
+
+设计文档中的内联 JSON 示例为说明性样例；可执行的机器契约与自动校验产物统一维护在以下入口（见 [D00.3 机器契约验证报告](../development/evidence/d00-3-machine-contract-verification.md)）：
+
+- [OpenAPI 3.1 服务契约（47 条路径 / 54 个操作 / 57 个组件 Schema）](openapi-v1.json)
+- [Apifox 目录分组与预填示例包（目录 `01`–`11`）](apifox-openapi-bundle.json) · [对外与内部 API URL 全景目录](api-url-catalog.md)
+- JSON Schema (Draft 2020-12)：[南向遥测 `telemetry-v1`](schemas/telemetry-v1.schema.json) · [南向状态 `source-state-v1`](schemas/source-state-v1.schema.json) · [设备视图与影子 `device-view-v1`](schemas/device-view-v1.schema.json) · [历史查询 `history-query-v1`](schemas/history-query-v1.schema.json)
+- 自动契约校验脚本：[`scripts/verify-machine-contracts.py`](../../scripts/verify-machine-contracts.py)（55 项路由与 `$ref` 检查 + 59 项正反契约断言）
+
+生产上线前仍需结合现场网关报文、真实服务身份体系（mTLS / 短期签名令牌部署配置）及外部生产 TSDB 版本完成 D09/D10/C05 现场签收。

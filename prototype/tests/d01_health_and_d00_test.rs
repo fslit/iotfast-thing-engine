@@ -23,8 +23,14 @@ fn d01_reports_duckdb_v2_and_verifies_d00_and_scope_boundaries() {
     .unwrap();
     assert_eq!(obs_id, "obs-hzg4jz6lu5qzfhygt5o3wtyrpi");
 
-    let p1 = WalPosition { segment_no: 1, record_offset: 9 };
-    let p2 = WalPosition { segment_no: 1, record_offset: 10 };
+    let p1 = WalPosition {
+        segment_no: 1,
+        record_offset: 9,
+    };
+    let p2 = WalPosition {
+        segment_no: 1,
+        record_offset: 10,
+    };
     assert!(p1.encode() < p2.encode());
 
     let ctx = VerifiedScopeContext {
